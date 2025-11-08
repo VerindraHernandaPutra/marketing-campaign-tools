@@ -1,0 +1,23 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { App } from './App';
+import Dashboard from './pages/Dashboard';
+import CampaignManager from './pages/CampaignManager';
+import ScheduledPosts from './pages/ScheduledPosts';
+import Analytics from './pages/Analytics';
+import Projects from './pages/Projects';
+import Folders from './pages/Folders';
+import Templates from './pages/Templates';
+export function AppRouter() {
+  return <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/editor" element={<App />} />
+        <Route path="/campaign-manager" element={<CampaignManager />} />
+        <Route path="/scheduled" element={<ScheduledPosts />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/folders" element={<Folders />} />
+        <Route path="/templates" element={<Templates />} />
+      </Routes>
+    </BrowserRouter>;
+}
