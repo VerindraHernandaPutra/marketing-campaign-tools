@@ -1,73 +1,74 @@
-# React + TypeScript + Vite
+# 🌐 Marketing Campaign Tools
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Deskripsi singkat proyekmu — misalnya:
+> Website ini dibangun menggunakan React + TypeScript + Vite dengan dukungan UI Mantine, TailwindCSS, serta integrasi grafik dan kalender menggunakan Recharts dan FullCalendar.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Tech Stack
 
-## React Compiler
+**Frontend Framework:**
+- [React](https://react.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/) — build tool super cepat
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**UI Library:**
+- [Mantine](https://mantine.dev/) — komponen React modern & powerful
+- [TailwindCSS](https://tailwindcss.com/) — utility-first CSS framework
+- [Lucide React](https://lucide.dev/) — ikon open-source untuk React
 
-## Expanding the ESLint configuration
+**Visualization & Calendar:**
+- [Recharts](https://recharts.org/) — visualisasi data berbasis chart
+- [FullCalendar](https://fullcalendar.io/) — tampilan kalender interaktif (day grid, time grid, dsb.)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Routing:**
+- [React Router DOM](https://reactrouter.com/en/main) — manajemen rute halaman SPA
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## ⚙️ Software Requirements
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Pastikan perangkat kamu sudah memiliki:
+
+| Software | Minimum Version | Keterangan |
+|-----------|-----------------|-------------|
+| **Node.js** | `>= 18.x` | Menjalankan server pengembangan & build proyek |
+| **npm** | `>= 9.x` | Manajemen dependensi |
+| **Vite** | (included via npm) | Build tool & dev server |
+| **Browser Modern** | (Chrome/Edge/Firefox) | Untuk menjalankan aplikasi |
+
+---
+
+## 📦 Instalasi Dependensi
+
+Clone repositori ini terlebih dahulu:
+
+```bash
+git clone https://github.com/username/nama-proyek.git
+cd nama-proyek
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Lalu jalankan perintah berikut untuk menginstal seluruh dependensi utama dan dev:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install react react-dom @mantine/core @mantine/hooks react-router-dom lucide-react @mantine/dates @fullcalendar/react @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction recharts
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Tambahkan dependensi pengembangan (TypeScript, linting, dan styling):
+```bash
+npm install --save-dev @types/node @types/react @types/react-dom @typescript-eslint/eslint-plugin @typescript-eslint/parser @vitejs/plugin-react eslint eslint-plugin-react-hooks eslint-plugin-react-refresh typescript vite tailwindcss@3 autoprefixer postcss
+```
+
+## 🎨 Konfigurasi TailwindCSS
+
+Inisialisasi Tailwind dan PostCSS:
+```bash
+npx tailwindcss init -p
+```
+
+## 🧠 Skrip Pengembangan
+
+Menjalankan server pengembangan:
+```bash
+npm run dev
 ```
