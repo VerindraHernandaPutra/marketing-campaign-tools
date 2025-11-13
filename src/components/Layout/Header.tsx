@@ -1,5 +1,4 @@
 import React from 'react';
-// 'Text' dihapus karena tidak terpakai
 import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box } from '@mantine/core';
 import { MenuIcon, SaveIcon, ShareIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon } from 'lucide-react';
 
@@ -8,20 +7,23 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   propertiesPanelOpened: boolean;
   onTogglePropertiesPanel: () => void;
+  onSave: () => void;
+  projectTitle: string;
 }
 
 const Header: React.FC<HeaderProps> = ({
-  // 'sidebarOpened' dan 'propertiesPanelOpened' dihapus dari destructuring (tidak terpakai)
   onToggleSidebar,
-  onTogglePropertiesPanel
+  onTogglePropertiesPanel,
+  onSave,
+  projectTitle 
 }) => {
   const {
     colorScheme,
     toggleColorScheme
   } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
+
   return <Box p="xs" h={60}>
-      {/* 'position' diubah menjadi 'justify' DAN 'sx' diubah menjadi 'style' */}
       <Group justify="space-between" style={{
       height: '100%'
     }}>
@@ -29,19 +31,20 @@ const Header: React.FC<HeaderProps> = ({
           <ActionIcon onClick={onToggleSidebar} size="lg">
             <MenuIcon size={20} />
           </ActionIcon>
-          <Title order={3}>Marketing Campaign Tools</Title>
+          <Title order={3}>{projectTitle}</Title>
           <Divider orientation="vertical" />
           {/* 'spacing' diubah menjadi 'gap' */}
           <Group gap="xs">
             <Menu shadow="md" width={200}>
               <Menu.Target>
-                {/* 'compact' dihapus */}
                 <Button variant="subtle">
                   File
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item leftSection={<SaveIcon size={14} />}>Save</Menu.Item>
+                <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>
+                  Save
+                </Menu.Item>
                 <Menu.Item leftSection={<DownloadIcon size={14} />}>
                   Download
                 </Menu.Item>

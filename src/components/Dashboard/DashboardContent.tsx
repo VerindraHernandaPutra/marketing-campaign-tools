@@ -1,49 +1,30 @@
-import React, { useState } from 'react';
-import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button } from '@mantine/core';
-// 'PlusIcon' dihapus karena tidak terpakai
+import React, { useState, useEffect } from 'react';
+import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader } from '@mantine/core';
 import { LayoutIcon, ImageIcon, FileTextIcon } from 'lucide-react';
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
+import { supabase } from '../../supabaseClient';
+
+// 1. Import the CanvasElement type
+import { CanvasElement } from '../Layout/Canvas'; 
+
+// 2. Update the Project type
+type Project = {
+  id: string;
+  user_id: string;
+  title: string;
+  canvas_data: CanvasElement[] | null;
+  thumbnail_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 const DashboardContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | null>('recent');
-  const mockDesigns = [{
-    id: '1',
-    title: 'Instagram Post',
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a-8bd57fbe?w=400',
-    lastEdited: '2 hours ago',
-    type: 'Social Media'
-  }, {
-    id: '2',
-    title: 'Presentation Slide',
-    thumbnail: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400',
-    lastEdited: '1 day ago',
-    type: 'Presentation'
-  }, {
-    id: '3',
-    title: 'Logo Design',
-    thumbnail: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400',
-    lastEdited: '3 days ago',
-    type: 'Logo'
-  }, {
-    id: '4',
-    title: 'Business Card',
-    thumbnail: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400',
-    lastEdited: '5 days ago',
-    type: 'Print'
-  }, {
-    id: '5',
-    title: 'Flyer Design',
-    thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400',
-    lastEdited: '1 week ago',
-    type: 'Marketing'
-  }, {
-    id: '6',
-    title: 'Social Media Banner',
-    thumbnail: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
-    lastEdited: '1 week ago',
-    type: 'Social Media'
-  }];
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // We leave the mock templates for now
   const templates = [{
     id: 't1',
     title: 'Instagram Story',
@@ -66,6 +47,28 @@ const DashboardContent: React.FC = () => {
     category: 'Document'
   }];
 
+  useEffect(() => {
+    const fetchRecentProjects = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('updated_at', { ascending: false }) 
+        .limit(4); 
+
+      if (error) {
+        console.error('Error fetching recent projects:', error);
+      } else if (data) {
+        setProjects(data);
+      }
+      setLoading(false);
+    };
+
+    if (activeTab === 'recent') {
+      fetchRecentProjects();
+    }
+  }, [activeTab]); 
+
   return <Box className="py-8">
       <Container size="xl">
         <Box mb="xl">
@@ -75,7 +78,6 @@ const DashboardContent: React.FC = () => {
           <Text color="dimmed" size="sm" mb="lg">
             Choose a template or start from scratch
           </Text>
-          {/* 'cols' diubah menjadi objek untuk responsivitas, 'breakpoints' dihapus */}
           <SimpleGrid 
             cols={{ base: 2, sm: 3, md: 5 }} 
             spacing="md"
@@ -87,38 +89,53 @@ const DashboardContent: React.FC = () => {
             <CreateNewCard icon={<ImageIcon size={32} />} title="Logo" description="500 x 500 px" />
           </SimpleGrid>
         </Box>
-        {/* 'onTabChange' diubah menjadi 'onChange' */}
+        
         <Tabs value={activeTab} onChange={setActiveTab} className="mt-8">
           <Tabs.List>
             <Tabs.Tab value="recent">Recent designs</Tabs.Tab>
             <Tabs.Tab value="templates">Templates</Tabs.Tab>
             <Tabs.Tab value="folders">Folders</Tabs.Tab>
           </Tabs.List>
+          
           <Tabs.Panel value="recent" pt="xl">
-            {/* 'position' diubah menjadi 'justify' */}
             <Group justify="space-between" mb="md">
               <Title order={3}>Your designs</Title>
               <Button variant="subtle" size="sm">
                 View all
               </Button>
             </Group>
-            {/* 'cols' diubah menjadi objek untuk responsivitas, 'breakpoints' dihapus */}
-            <SimpleGrid 
-              cols={{ base: 2, sm: 3, md: 4 }} 
-              spacing="lg"
-            >
-              {mockDesigns.map(design => <DesignCard key={design.id} design={design} />)}
-            </SimpleGrid>
+            
+            {loading ? (
+              <Center mt="xl" style={{ height: 100 }}>
+                <Loader />
+              </Center>
+            ) : (
+              <SimpleGrid 
+                cols={{ base: 2, sm: 3, md: 4 }} 
+                spacing="lg"
+              >
+                {projects.map(project => (
+                  <DesignCard 
+                    key={project.id} 
+                    design={{
+                      id: project.id,
+                      title: project.title,
+                      thumbnail: project.thumbnail_url || 'https://images.unsplash.com/photo-1618005182384-a83a-8bd57fbe?w=400',
+                      updated_at: project.updated_at
+                    }} 
+                  />
+                ))}
+              </SimpleGrid>
+            )}
           </Tabs.Panel>
+          
           <Tabs.Panel value="templates" pt="xl">
-            {/* 'position' diubah menjadi 'justify' */}
             <Group justify="space-between" mb="md">
               <Title order={3}>Popular templates</Title>
               <Button variant="subtle" size="sm">
                 View all
               </Button>
             </Group>
-            {/* 'cols' diubah menjadi objek untuk responsivitas, 'breakpoints' dihapus */}
             <SimpleGrid 
               cols={{ base: 2, sm: 3, md: 4 }} 
               spacing="lg"

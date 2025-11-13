@@ -16,7 +16,7 @@ export function AppRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/editor" element={<App />} />
+          <Route path="/editor/:projectId" element={<App />} />
           <Route path="/campaign-manager" element={<CampaignManager />} />
           <Route path="/scheduled" element={<ScheduledPosts />} />
           <Route path="/analytics" element={<Analytics />} />

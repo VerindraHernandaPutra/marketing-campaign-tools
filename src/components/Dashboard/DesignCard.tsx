@@ -2,17 +2,33 @@ import React from 'react';
 import { Paper, Text, Group, ActionIcon, Menu, Image, Box, UnstyledButton, Badge } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { MoreVerticalIcon, TrashIcon, CopyIcon, FolderIcon, ShareIcon, DownloadIcon } from 'lucide-react';
-
 interface DesignCardProps {
   design: {
     id: string;
     title: string;
     thumbnail: string;
-    lastEdited?: string;
-    type?: string;
+    updated_at?: string | null;
     category?: string;
   };
   isTemplate?: boolean;
+}
+
+// 2. This function IS used now
+function timeAgo(dateString: string | null | undefined): string {
+  if (!dateString) return 'just now';
+  const date = new Date(dateString);
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes ago";
+  return Math.floor(seconds) + " seconds ago";
 }
 
 const DesignCard: React.FC<DesignCardProps> = ({
@@ -20,8 +36,20 @@ const DesignCard: React.FC<DesignCardProps> = ({
   isTemplate
 }) => {
   const navigate = useNavigate();
+
+  // 3. This function IS used now
+  const handleClick = () => {
+    if (isTemplate) {
+      // Handle template creation (we can build this next)
+      // e.g., create a new project based on this template
+    } else {
+      navigate(`/editor/${design.id}`);
+    }
+  };
+
   return <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-      <UnstyledButton onClick={() => navigate('/editor')} className="w-full">
+      {/* 4. Attach handleClick to the onClick prop */}
+      <UnstyledButton onClick={handleClick} className="w-full">
         <Box className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <Image src={design.thumbnail} alt={design.title} fit="cover" className="w-full h-full" />
           {isTemplate && <Badge className="absolute top-2 right-2" color="purple" variant="filled" size="sm">
@@ -30,19 +58,23 @@ const DesignCard: React.FC<DesignCardProps> = ({
         </Box>
       </UnstyledButton>
       <Box p="md">
-        {/* 'position' diubah menjadi 'justify' DAN 'noWrap' diubah menjadi 'wrap="nowrap"' */}
         <Group justify="space-between" wrap="nowrap">
           <Box className="flex-1 min-w-0">
-            {/* 'weight' diubah menjadi 'fw' */}
             <Text fw={500} size="sm" lineClamp={1}>
               {design.title}
             </Text>
-            {design.lastEdited && <Text size="xs" color="dimmed" mt={2}>
-                Edited {design.lastEdited}
-              </Text>}
-            {design.category && <Text size="xs" color="dimmed" mt={2}>
+
+            {design.updated_at && !isTemplate && (
+              <Text size="xs" color="dimmed" mt={2}>
+                Edited {timeAgo(design.updated_at)}
+              </Text>
+            )}
+
+            {design.category && isTemplate && (
+              <Text size="xs" color="dimmed" mt={2}>
                 {design.category}
-              </Text>}
+              </Text>
+            )}
           </Box>
           <Menu shadow="md" width={200}>
             <Menu.Target>
