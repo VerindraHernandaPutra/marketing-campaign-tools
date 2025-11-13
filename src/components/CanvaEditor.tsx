@@ -1,22 +1,17 @@
 import React, { useState } from 'react';
 import { AppShell, useMantineTheme } from '@mantine/core';
+import { fabric } from 'fabric';
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
-import Canvas from './Layout/Canvas';
+import FabricCanvas from './Layout/FabricCanvas';
 import PropertiesPanel from './Layout/PropertiesPanel';
 
 const CanvaEditor: React.FC = () => {
   const theme = useMantineTheme();
-  const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
-
-  const handleElementSelect = (id: string | null) => {
-    setSelectedElement(id);
-    if (id && !propertiesPanelOpened) {
-      setPropertiesPanelOpened(true);
-    }
-  };
+  const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
+  const [activeObject, setActiveObject] = useState<fabric.Object | null>(null);
 
   return <AppShell 
     styles={{
@@ -36,7 +31,7 @@ const CanvaEditor: React.FC = () => {
       width: 300,
       breakpoint: 'sm',
       // 'collapsed' diubah menjadi objek untuk v7
-      collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedElement }
+      collapsed: { mobile: true, desktop: !propertiesPanelOpened || !activeObject }
     }} 
     header={{
       height: 60
@@ -46,13 +41,17 @@ const CanvaEditor: React.FC = () => {
         <Header sidebarOpened={sidebarOpened} onToggleSidebar={() => setSidebarOpened(!sidebarOpened)} propertiesPanelOpened={propertiesPanelOpened} onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} />
       </AppShell.Header>
       <AppShell.Navbar>
-        {sidebarOpened && <Sidebar opened={sidebarOpened} onToggle={() => setSidebarOpened(!sidebarOpened)} />}
+        {sidebarOpened && <Sidebar opened={sidebarOpened} onToggle={() => setSidebarOpened(!sidebarOpened)} canvas={canvas} />}
       </AppShell.Navbar>
       <AppShell.Aside>
-        {propertiesPanelOpened && selectedElement && <PropertiesPanel opened={propertiesPanelOpened} onToggle={() => setPropertiesPanelOpened(!propertiesPanelOpened)} selectedElement={selectedElement} />}
+        {propertiesPanelOpened && activeObject && <PropertiesPanel
+          opened={propertiesPanelOpened}
+          onToggle={() => setPropertiesPanelOpened(!propertiesPanelOpened)}
+          activeObject={activeObject}
+          canvas={canvas} />}
       </AppShell.Aside>
       <AppShell.Main>
-        <Canvas onElementSelect={handleElementSelect} selectedElement={selectedElement} />
+        <FabricCanvas setCanvas={setCanvas} setActiveObject={setActiveObject} />
       </AppShell.Main>
     </AppShell>;
 };
