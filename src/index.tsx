@@ -1,12 +1,20 @@
-// 'React' dihapus karena tidak diperlukan untuk JSX transform baru (React 17+)
+import React from 'react';
 import './index.css';
-// 'render' diganti dengan 'createRoot' dari 'react-dom/client' (React 18)
 import { createRoot } from 'react-dom/client'; 
 import { AppRouter } from './AppRouter';
 import '@mantine/core/styles.css';
+import { AuthProvider } from './auth/AuthProvider';
+import { MantineProvider } from '@mantine/core';
 
-// Menggunakan sintaks API createRoot (React 18)
 const container = document.getElementById('root');
-// '!' digunakan untuk memberi tahu TypeScript bahwa 'container' tidak akan null
 const root = createRoot(container!); 
-root.render(<AppRouter />);
+
+root.render(
+  <React.StrictMode>
+    <MantineProvider theme={{}}>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </MantineProvider>
+  </React.StrictMode>
+);

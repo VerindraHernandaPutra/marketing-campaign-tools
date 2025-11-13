@@ -2,6 +2,7 @@
 import React from 'react';
 import { Group, TextInput, ActionIcon, Menu, Avatar, Text, UnstyledButton, Box, Container } from '@mantine/core';
 import { SearchIcon, BellIcon, SunIcon, MoonIcon, UserIcon, SettingsIcon, LogOutIcon, CrownIcon } from 'lucide-react';
+import { useAuth } from '../../auth/useAuth';
 
 interface DashboardHeaderProps {
   colorScheme: string;
@@ -12,6 +13,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   colorScheme,
   toggleColorScheme
 }) => {
+  const { signOut } = useAuth()
   const isDark = colorScheme === 'dark';
   return <Box component="header" h={70} className="border-b border-gray-200 dark:border-gray-700">
       <Container size="xl" className="h-full">
@@ -60,7 +62,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   Settings
                 </Menu.Item>
                 <Menu.Divider />
-                <Menu.Item leftSection={<LogOutIcon size={14} />} color="red">
+                <Menu.Item leftSection={<LogOutIcon size={14} />} color="red" onClick={async () => await signOut()}>
                   Logout
                 </Menu.Item>
               </Menu.Dropdown>
