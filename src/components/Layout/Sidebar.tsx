@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { fabric } from 'fabric';
 // MantineTheme ditambahkan
 import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme } from '@mantine/core';
 import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, FileTextIcon, GridIcon, TableIcon, BoxIcon } from 'lucide-react';
@@ -7,79 +6,22 @@ import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, 
 interface SidebarProps {
   opened: boolean;
   onToggle: () => void;
-  canvas: fabric.Canvas | null;
 }
 
 // Argumen diubah dari '({})' menjadi '()' untuk memperbaiki error 'no-empty-pattern'
-const Sidebar: React.FC<SidebarProps> = ({ canvas }) => {
+const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
-  const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line') => {
-    if (!canvas) return;
-    let shape;
-    switch (shapeType) {
-      case 'rect':
-        shape = new fabric.Rect({
-          width: 100,
-          height: 100,
-          fill: theme.colors.blue[6]
-        });
-        break;
-      case 'circle':
-        shape = new fabric.Circle({
-          radius: 50,
-          fill: theme.colors.green[6]
-        });
-        break;
-      case 'triangle':
-        shape = new fabric.Triangle({
-          width: 100,
-          height: 100,
-          fill: theme.colors.yellow[6]
-        });
-        break;
-      case 'line':
-        shape = new fabric.Line([50, 100, 200, 200], {
-          stroke: theme.colors.red[6],
-          strokeWidth: 2
-        });
-        break;
-    }
-    canvas.add(shape);
-    canvas.renderAll();
-  };
-  const addText = (textType: 'heading' | 'paragraph') => {
-    if (!canvas) return;
-    let text;
-    switch (textType) {
-      case 'heading':
-        text = new fabric.Textbox('Heading', {
-          fontSize: 28,
-          fontWeight: 'bold'
-        });
-        break;
-      case 'paragraph':
-        text = new fabric.Textbox('Paragraph', {
-          fontSize: 16
-        });
-        break;
-    }
-    canvas.add(text);
-    canvas.renderAll();
-  };
   const ElementItem = ({
     icon: Icon,
-    label,
-    onClick
+    label
   }: {
     // 'any' diubah menjadi 'React.ElementType'
     icon: React.ElementType;
     label: string;
-    onClick: () => void;
   }) => (
     // 'sx' diubah menjadi 'style', 'theme' diberi tipe, dan '&:hover' dipindahkan ke 'className'
     <UnstyledButton 
-      onClick={onClick}
       className="hover:bg-gray-0 dark:hover:bg-dark-6" // Tailwind untuk hover
       style={(theme: MantineTheme) => ({
         display: 'flex',
@@ -141,10 +83,10 @@ const Sidebar: React.FC<SidebarProps> = ({ canvas }) => {
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={3} spacing="xs">
-                  <ElementItem icon={SquareIcon} label="Square" onClick={() => addShape('rect')} />
-                  <ElementItem icon={CircleIcon} label="Circle" onClick={() => addShape('circle')} />
-                  <ElementItem icon={TriangleIcon} label="Triangle" onClick={() => addShape('triangle')} />
-                  <ElementItem icon={BoxIcon} label="Line" onClick={() => addShape('line')} />
+                  <ElementItem icon={SquareIcon} label="Square" />
+                  <ElementItem icon={CircleIcon} label="Circle" />
+                  <ElementItem icon={TriangleIcon} label="Triangle" />
+                  <ElementItem icon={BoxIcon} label="Line" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -152,8 +94,8 @@ const Sidebar: React.FC<SidebarProps> = ({ canvas }) => {
               <Accordion.Control>Text</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={TypeIcon} label="Heading" onClick={() => addText('heading')} />
-                  <ElementItem icon={FileTextIcon} label="Paragraph" onClick={() => addText('paragraph')} />
+                  <ElementItem icon={TypeIcon} label="Heading" />
+                  <ElementItem icon={FileTextIcon} label="Paragraph" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -161,8 +103,8 @@ const Sidebar: React.FC<SidebarProps> = ({ canvas }) => {
               <Accordion.Control>Media</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={ImageIcon} label="Image" onClick={() => {}} />
-                  <ElementItem icon={GridIcon} label="Grid" onClick={() => {}} />
+                  <ElementItem icon={ImageIcon} label="Image" />
+                  <ElementItem icon={GridIcon} label="Grid" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -170,8 +112,8 @@ const Sidebar: React.FC<SidebarProps> = ({ canvas }) => {
               <Accordion.Control>Layouts</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={LayoutIcon} label="Layout" onClick={() => {}} />
-                  <ElementItem icon={TableIcon} label="Table" onClick={() => {}} />
+                  <ElementItem icon={LayoutIcon} label="Layout" />
+                  <ElementItem icon={TableIcon} label="Table" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
