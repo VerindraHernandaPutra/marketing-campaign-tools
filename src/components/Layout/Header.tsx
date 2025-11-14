@@ -11,6 +11,10 @@ interface HeaderProps {
   projectTitle: string;
   onSave: () => void;
   onToggleResizeModal: () => void;
+  // 2. FIX: Add zoom props
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onFitToCanvas: () => void; // 3. FIX: Renamed prop
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -18,7 +22,11 @@ const Header: React.FC<HeaderProps> = ({
   onTogglePropertiesPanel,
   projectTitle,
   onSave,
-  onToggleResizeModal
+  onToggleResizeModal,
+  // 4. FIX: Destructure zoom props
+  onZoomIn,
+  onZoomOut,
+  onFitToCanvas // 5. FIX: Renamed prop
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
@@ -45,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>Save</Menu.Item>
-                {/* 2. FIX: Use 'ExpandIcon' here */}
+                {/* 6. FIX: Use 'ExpandIcon' here */}
                 <Menu.Item leftSection={<ExpandIcon size={14} />} onClick={onToggleResizeModal}>
                   Resize
                 </Menu.Item>
@@ -74,10 +82,12 @@ const Header: React.FC<HeaderProps> = ({
                   View
                 </Button>
               </Menu.Target>
+              {/* 7. FIX: Add onClick handlers for zoom */}
               <Menu.Dropdown>
-                <Menu.Item>Zoom In</Menu.Item>
-                <Menu.Item>Zoom Out</Menu.Item>
-                <Menu.Item>Fit to Screen</Menu.Item>
+                <Menu.Item onClick={onZoomIn}>Zoom In</Menu.Item>
+                <Menu.Item onClick={onZoomOut}>Zoom Out</Menu.Item>
+                {/* 8. FIX: Renamed item and updated onClick */}
+                <Menu.Item onClick={onFitToCanvas}>Fit to Canvas</Menu.Item>
               </Menu.Dropdown>
             </Menu>
           </Group>

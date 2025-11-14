@@ -1,5 +1,5 @@
-// 1. FIX: Removed 'useMantineTheme' from import
-import React, { useState, useEffect } from 'react';
+// 1. FIX: Removed 'useMantineTheme' and added 'useRef'
+import React, { useState, useEffect, useRef } from 'react';
 import { AppShell } from '@mantine/core'; // 'useMantineTheme' removed
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
@@ -8,7 +8,8 @@ import PropertiesPanel from './Layout/PropertiesPanel';
 import ResizeModal from './Layout/ResizeModal';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Canvas, Object as FabricObject } from 'fabric';
+// 2. FIX: Import 'Point' from fabric
+import { Canvas, Object as FabricObject, Point } from 'fabric';
 
 import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
 
@@ -19,8 +20,7 @@ type LoadedCanvasData = {
 };
 
 const CanvaEditor: React.FC = () => {
-  // 2. FIX: Removed 'theme' variable
-  // const theme = useMantineTheme();
+  // ... (state variables remain the same) ...
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
 
@@ -34,6 +34,9 @@ const CanvaEditor: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   
   const [projectData, setProjectData] = useState<string | null>(null);
+
+  // 3. FIX: Add ref for the main canvas area
+  const mainAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -87,6 +90,64 @@ const CanvaEditor: React.FC = () => {
     setIsResizeModalOpen(false);
   };
 
+  // 4. FIX: Use 'new Point()' for zoom center
+  const handleZoomIn = () => {
+    if (!canvas) return;
+    const currentZoom = canvas.getZoom();
+    let newZoom = currentZoom * 1.2;
+    if (newZoom > 20) newZoom = 20; // Max zoom 20x
+    
+    const center = new Point(
+      mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
+      mainAreaRef.current ? mainAreaRef.current.clientHeight / 2 : canvas.getHeight() / 2
+    );
+
+    canvas.zoomToPoint(center, newZoom);
+    canvas.renderAll();
+  };
+
+  // 5. FIX: Use 'new Point()' for zoom center
+  const handleZoomOut = () => {
+    if (!canvas) return;
+    const currentZoom = canvas.getZoom();
+    let newZoom = currentZoom / 1.2;
+    if (newZoom < 0.1) newZoom = 0.1; // Min zoom 0.1x
+    
+    const center = new Point(
+      mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
+      mainAreaRef.current ? mainAreaRef.current.clientHeight / 2 : canvas.getHeight() / 2
+    );
+
+    canvas.zoomToPoint(center, newZoom);
+    canvas.renderAll();
+  };
+
+  // 6. FIX: Renamed to handleFitToCanvas and updated logic
+  const handleFitToCanvas = () => {
+    if (!canvas || !mainAreaRef.current) return;
+
+    const containerWidth = mainAreaRef.current.clientWidth;
+    const containerHeight = mainAreaRef.current.clientHeight;
+    const designWidth = dimensions.width;
+    const designHeight = dimensions.height;
+    
+    const newZoom = 1.0; // Reset zoom to 100%
+
+    // Reset viewport transform (identity matrix)
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+
+    // Calculate new pan to center the 100% canvas
+    const panX = (containerWidth - designWidth * newZoom) / 2;
+    const panY = (containerHeight - designHeight * newZoom) / 2;
+
+    canvas.setZoom(newZoom);
+    // Apply new zoom and pan
+    canvas.setViewportTransform([newZoom, 0, 0, newZoom, panX, panY]);
+    
+    canvas.renderAll();
+  };
+
+
   const contextValue: CanvasContextType = {
     canvas,
     selectedObject
@@ -98,7 +159,7 @@ const CanvaEditor: React.FC = () => {
         styles={{
           main: {
             padding: 0,
-            // 3. FIX: Explicitly set the main area's height to
+            // 7. FIX: Explicitly set the main area's height to
             // fill the viewport (100vh) minus the header (60px).
             height: 'calc(100vh - 60px)',
           }
@@ -126,6 +187,10 @@ const CanvaEditor: React.FC = () => {
             propertiesPanelOpened={propertiesPanelOpened} 
             onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
             onToggleResizeModal={() => setIsResizeModalOpen(true)}
+            // 8. FIX: Pass zoom functions to Header
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onFitToCanvas={handleFitToCanvas} // 9. FIX: Renamed prop
           />
         </AppShell.Header>
         
@@ -142,7 +207,8 @@ const CanvaEditor: React.FC = () => {
           )}
         </AppShell.Aside>
         
-        <AppShell.Main>
+        {/* 10. FIX: Add ref to AppShell.Main */}
+        <AppShell.Main ref={mainAreaRef}>
           <CanvasComponent 
             setCanvas={setCanvas}
             setSelectedObject={setSelectedObject}

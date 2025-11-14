@@ -16,7 +16,8 @@ import {
   SparklesIcon  // Added for AI
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
-import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline } from 'fabric';
+// 3. FIX: Added 'Image as FabricImage' to the import
+import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline, Image as FabricImage } from 'fabric';
 
 interface SidebarProps {
   opened: boolean;
@@ -26,10 +27,11 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
-  // 3. FIX: Add state for the AI prompt
+  // 4. FIX: Add state for the AI prompt
   const [aiPrompt, setAiPrompt] = useState('');
   const { canvas } = useFabricCanvas();
 
+  // ... (addShape and addText functions remain the same) ...
   const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line' | 'ellipse' | 'polygon' | 'polyline') => {
     if (!canvas) return;
     
@@ -99,7 +101,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
     }
   };
 
-  // 4. FIX: Updated 'addText' to include 'subheading'
   const addText = (textType: 'heading' | 'subheading' | 'paragraph') => {
     if (!canvas) return;
     let text;
@@ -108,12 +109,10 @@ const Sidebar: React.FC<SidebarProps> = () => {
       case 'heading':
         text = new Textbox('Heading', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 48, fontWeight: 'bold' });
         break;
-      // 5. FIX: Added 'subheading' option
       case 'subheading':
         text = new Textbox('Subheading', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 32, fontWeight: 'normal' });
         break;
       case 'paragraph':
-        // 6. FIX: Reduced paragraph font size
         text = new Textbox('Paragraph text', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 16, width: 250 });
         break;
     }
@@ -124,17 +123,59 @@ const Sidebar: React.FC<SidebarProps> = () => {
     }
   };
 
+
+  // 5. FIX: Refactor handleAddMedia to use async/await
   const handleAddMedia = () => {
-    alert('Media/Layouts not implemented yet. Adding a placeholder square.');
-    if (canvas) {
-      const rect = new Rect({ left: 150, top: 150, width: 100, height: 100, fill: theme.colors.green[4] });
-      canvas.add(rect);
-      canvas.setActiveObject(rect);
-      canvas.renderAll();
-    }
+    // Create a hidden file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file || !canvas) return;
+
+      const reader = new FileReader();
+      
+      // Make the onload callback async
+      reader.onload = async (f) => {
+        try {
+          const data = f.target?.result as string;
+          
+          // Await the image loading
+          const img = await FabricImage.fromURL(data);
+
+          // Scale image to fit canvas if it's too large
+          const canvasWidth = canvas.getWidth();
+          const canvasHeight = canvas.getHeight();
+          // Calculate scale to fit image within 80% of canvas dimensions
+          const scale = Math.min(
+            (canvasWidth * 0.8) / (img.width || canvasWidth), 
+            (canvasHeight * 0.8) / (img.height || canvasHeight)
+          );
+
+          img.set({
+            // Center the image
+            left: (canvasWidth - (img.width || 0) * scale) / 2,
+            top: (canvasHeight - (img.height || 0) * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
+          });
+
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          canvas.renderAll();
+        } catch (error) {
+          console.error("Error loading image:", error);
+          alert("Could not load the image.");
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    // Trigger the file input click
+    input.click();
   };
 
-  // 7. FIX: Added placeholder for AI generation
+  // ... (handleGenerateAI and ElementItem component remain the same) ...
   const handleGenerateAI = () => {
     alert(`AI Generation for prompt: "${aiPrompt}" is not implemented yet.`);
   };
@@ -166,8 +207,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
       </Text>
     </UnstyledButton>
   );
+
   
-  return <Box p="md" w={300}>
+  return (
+    <Box p="md" w={300}>
+      {/* ... (Tabs UI remains the same) ... */}
       <Box mt="xs">
         {/* ... (Tabs) ... */}
         <Group justify="center" mb="md">
@@ -202,6 +246,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         </Group>
         <Divider mb="md" />
       </Box>
+
+      {/* ... (ScrollArea and Accordion UI remains the same) ... */}
       <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs">
         {activeTab === 'elements' ? <Accordion multiple defaultValue={['shapes']}>
             <Accordion.Item value="shapes">
@@ -282,7 +328,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
                 </div>)}
           </SimpleGrid>}
       </ScrollArea>
-    </Box>;
+    </Box>
+  );
 };
 
 export default Sidebar;
