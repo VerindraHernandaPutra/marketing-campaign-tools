@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme } from '@mantine/core';
 import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, FileTextIcon, GridIcon, TableIcon, BoxIcon } from 'lucide-react';
-import { Textbox, Rect, Image } from 'fabric';
-import { useFabricCanvas } from '../../context/CanvasContext';
+import { useCanvas } from './CanvasContext';
+import { fabric } from 'fabric';
 
 interface SidebarProps {
   opened: boolean;
@@ -11,77 +11,80 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
-  const { canvas } = useFabricCanvas();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
+  const { addElement } = useCanvas();
 
-  const handleAddElement = (type: 'text' | 'shape') => {
-    if (!canvas) return;
-
-    if (type === 'text') {
-      const text = new Textbox('New Text', {
-        left: 50,
-        top: 50,
-        width: 200,
-        fontSize: 24,
-        fill: '#000',
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-    } else {
-      const rect = new Rect({
-        left: 100,
-        top: 100,
-        width: 100,
-        height: 100,
-        fill: theme.colors.blue[4],
-      });
-      canvas.add(rect);
-      canvas.setActiveObject(rect);
-    }
-    canvas.renderAll();
-  };
-  
-  const handleAddImage = () => {
-    if (!canvas) return;
-
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imgElement = document.createElement('img');
-        imgElement.src = event.target?.result as string;
-        imgElement.onload = () => {
-          const fabricImage = new Image(imgElement, {
-            left: 100,
-            top: 100,
-            scaleX: 0.5,
-            scaleY: 0.5,
-          });
-          canvas.add(fabricImage);
-          canvas.setActiveObject(fabricImage);
-          canvas.renderAll();
-        };
-      };
-      reader.readAsDataURL(file);
+  const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line') => {
+    let shape;
+    const options = {
+      left: 100,
+      top: 100,
+      fill: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
+      width: shapeType === 'line' ? 200 : 100,
+      height: shapeType === 'line' ? 2 : 100,
     };
-    input.click();
+
+    switch (shapeType) {
+      case 'rect':
+        shape = new fabric.Rect(options);
+        break;
+      case 'circle':
+        shape = new fabric.Circle({ ...options, radius: 50 });
+        break;
+      case 'triangle':
+        shape = new fabric.Triangle(options);
+        break;
+      case 'line':
+        shape = new fabric.Line([50, 50, 250, 50], { ...options, stroke: options.fill });
+        break;
+    }
+    if (shape) {
+      addElement(shape);
+    }
   };
-  
+
+  const addText = (textType: 'heading' | 'paragraph' | 'small' | 'medium' | 'big') => {
+    let text;
+    const options = {
+      left: 100,
+      top: 100,
+      fontFamily: 'Arial',
+      fill: `light-dark(${theme.black}, ${theme.white})`,
+    };
+
+    switch (textType) {
+      case 'heading':
+        text = new fabric.Textbox('Heading', { ...options, fontSize: 48, fontWeight: 'bold' });
+        break;
+      case 'paragraph':
+        text = new fabric.Textbox('Paragraph text', { ...options, fontSize: 24 });
+        break;
+      case 'small':
+        text = new fabric.Textbox('Small text', { ...options, fontSize: 16 });
+        break;
+      case 'medium':
+        text = new fabric.Textbox('Medium text', { ...options, fontSize: 32 });
+        break;
+      case 'big':
+        text = new fabric.Textbox('Big text', { ...options, fontSize: 64 });
+        break;
+    }
+    if (text) {
+      addElement(text);
+    }
+  };
+
   const ElementItem = ({
     icon: Icon,
     label,
-    onClick
+    onClick,
   }: {
     icon: React.ElementType;
     label: string;
     onClick: () => void;
   }) => (
-    <UnstyledButton 
+    <UnstyledButton
+      onClick={onClick}
       className="hover:bg-gray-0 dark:hover:bg-dark-6"
       style={(theme: MantineTheme) => ({
         display: 'flex',
@@ -91,7 +94,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
         borderRadius: theme.radius.md,
         color: `light-dark(${theme.black}, ${theme.colors.dark[0]})`,
       })}
-      onClick={onClick}
     >
       <Icon size={24} />
       <Text size="xs" mt={4}>
@@ -102,7 +104,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
   
   return <Box p="md" w={300}>
       <Box mt="xs">
+        {/* 'position' diubah menjadi 'justify' */}
         <Group justify="center" mb="md">
+          {/* 'sx' diubah menjadi 'style', 'theme' diberi tipe, '&:hover' dipindahkan ke 'className', 'colorScheme' diganti 'light-dark()' */}
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
             style={(theme: MantineTheme) => ({
@@ -117,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
           >
             <Text>Templates</Text>
           </UnstyledButton>
+          {/* 'sx' diubah menjadi 'style', 'theme' diberi tipe, '&:hover' dipindahkan ke 'className', 'colorScheme' diganti 'light-dark()' */}
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
             style={(theme: MantineTheme) => ({
@@ -140,10 +145,10 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={3} spacing="xs">
-                  <ElementItem icon={SquareIcon} label="Square" onClick={() => handleAddElement('shape')} />
-                  <ElementItem icon={CircleIcon} label="Circle" onClick={() => handleAddElement('shape')} />
-                  <ElementItem icon={TriangleIcon} label="Triangle" onClick={() => handleAddElement('shape')} />
-                  <ElementItem icon={BoxIcon} label="Line" onClick={() => handleAddElement('shape')} />
+                  <ElementItem icon={SquareIcon} label="Square" onClick={() => addShape('rect')} />
+                  <ElementItem icon={CircleIcon} label="Circle" onClick={() => addShape('circle')} />
+                  <ElementItem icon={TriangleIcon} label="Triangle" onClick={() => addShape('triangle')} />
+                  <ElementItem icon={BoxIcon} label="Line" onClick={() => addShape('line')} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -151,8 +156,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Text</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={TypeIcon} label="Heading" onClick={() => handleAddElement('text')} />
-                  <ElementItem icon={FileTextIcon} label="Paragraph" onClick={() => handleAddElement('text')} />
+                  <ElementItem icon={TypeIcon} label="Heading" onClick={() => addText('heading')} />
+                  <ElementItem icon={FileTextIcon} label="Paragraph" onClick={() => addText('paragraph')} />
+                  <ElementItem icon={TypeIcon} label="Small" onClick={() => addText('small')} />
+                  <ElementItem icon={TypeIcon} label="Medium" onClick={() => addText('medium')} />
+                  <ElementItem icon={TypeIcon} label="Big" onClick={() => addText('big')} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -160,8 +168,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Media</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={ImageIcon} label="Image" onClick={handleAddImage} />
-                  <ElementItem icon={GridIcon} label="Grid" onClick={handleAddImage} />
+                  <ElementItem icon={ImageIcon} label="Image" />
+                  <ElementItem icon={GridIcon} label="Grid" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -169,14 +177,15 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Layouts</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={LayoutIcon} label="Layout" onClick={handleAddImage} />
-                  <ElementItem icon={TableIcon} label="Table" onClick={handleAddImage} />
+                  <ElementItem icon={LayoutIcon} label="Layout" />
+                  <ElementItem icon={TableIcon} label="Table" />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion> : <SimpleGrid cols={2} spacing="md">
             {Array(8).fill(0).map((_, i) => <div key={i} style={{
           height: 120,
+          // 'theme.colorScheme' diganti dengan 'light-dark()'
           backgroundColor: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
           borderRadius: theme.radius.md,
           display: 'flex',
