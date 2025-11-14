@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Slider, TextInput, Box } from '@mantine/core';
 import { useFabricCanvas } from '../../context/CanvasContext';
-import fabric from 'fabric';
+// 1. Import new Fabric classes
+import { Object as FabricObject, Textbox, Rect, Circle, Triangle, Line, Ellipse, Polygon, Polyline } from 'fabric';
 
 interface PropertiesPanelProps {
   opened: boolean;
   onToggle: () => void;
+  // selectedElement prop is removed
 }
 
-// Helper function to check if object is a Textbox
-const isTextbox = (obj: fabric.Object | null): obj is fabric.Textbox => {
+const isTextbox = (obj: FabricObject | null): obj is Textbox => {
   return obj?.type === 'textbox' || obj?.type === 'i-text';
 };
 
-// Helper function to check if object is a Shape (like Rect)
-const isShape = (obj: fabric.Object | null): obj is fabric.Rect => {
-  return obj?.type === 'rect';
+// 2. FIX: Update isShape to include all our new types
+const isShape = (obj: FabricObject | null): obj is (Rect | Circle | Triangle | Line | Ellipse | Polygon | Polyline) => {
+  if (!obj) return false;
+  return ['rect', 'circle', 'triangle', 'line', 'ellipse', 'polygon', 'polyline'].includes(obj.type || '');
 };
+
 
 const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const { canvas, selectedObject } = useFabricCanvas();
@@ -27,7 +30,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const [width, setWidth] = useState(selectedObject?.getScaledWidth() || 100);
   const [height, setHeight] = useState(selectedObject?.getScaledHeight() || 100);
 
-  // Sync local state when the selected object changes
   useEffect(() => {
     if (selectedObject) {
       setOpacity(selectedObject.get('opacity') || 1);
@@ -50,8 +52,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
 
   const handleFillChange = (color: string) => {
     if (!canvas || !selectedObject) return;
-    
-    selectedObject.set('fill', color);
+
+    // Polyline and Line don't have 'fill', they have 'stroke'
+    if (selectedObject.type === 'line' || selectedObject.type === 'polyline') {
+      selectedObject.set('stroke', color);
+    } else {
+      selectedObject.set('fill', color);
+    }
     canvas.renderAll();
   };
   
@@ -165,7 +172,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
         <Divider my="md" />
         
         <div>
-          <Text size="xs" fw={500} mb={4}>Fill Color</Text>
+          <Text size="xs" fw={500} mb={4}>
+            {/* 3. FIX: Change label for lines/polylines */}
+            {selectedObject.type === 'line' || selectedObject.type === 'polyline' ? 'Stroke Color' : 'Fill Color'}
+          </Text>
           <Group gap="xs">
             {colors.map(color => (
               <ColorSwatch 

@@ -1,39 +1,41 @@
-import React from 'react';
-import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box } from '@mantine/core';
+import React from 'react'; // Removed useState
+import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box } from '@mantine/core'; // Removed TextInput
 import { MenuIcon, SaveIcon, ShareIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon } from 'lucide-react';
-
 interface HeaderProps {
   sidebarOpened: boolean;
   onToggleSidebar: () => void;
   propertiesPanelOpened: boolean;
   onTogglePropertiesPanel: () => void;
-  onSave: () => void;
   projectTitle: string;
+  onSave: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onTogglePropertiesPanel,
-  onSave,
-  projectTitle 
+  projectTitle, // 3. FIX: Destructure props
+  onSave
 }) => {
-  const {
-    colorScheme,
-    toggleColorScheme
-  } = useMantineColorScheme();
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
+  // 4. FIX: Remove old context state
+  // const { canvasTitle, setCanvasTitle } = useCanvas();
+  // const [isEditingTitle, setIsEditingTitle] = useState(false);
 
-  return <Box p="xs" h={60}>
-      <Group justify="space-between" style={{
-      height: '100%'
-    }}>
+  return (
+    <Box p="xs" h={60}>
+      <Group justify="space-between" style={{ height: '100%' }}>
         <Group>
           <ActionIcon onClick={onToggleSidebar} size="lg">
             <MenuIcon size={20} />
           </ActionIcon>
-          <Title order={3}>{projectTitle}</Title>
+          
+          {/* 5. FIX: Use the 'projectTitle' prop */}
+          <Title order={3} style={{ cursor: 'pointer' }}>
+            {projectTitle}
+          </Title>
+         
           <Divider orientation="vertical" />
-          {/* 'spacing' diubah menjadi 'gap' */}
           <Group gap="xs">
             <Menu shadow="md" width={200}>
               <Menu.Target>
@@ -42,9 +44,8 @@ const Header: React.FC<HeaderProps> = ({
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>
-                  Save
-                </Menu.Item>
+                {/* 6. FIX: Use the 'onSave' prop */}
+                <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>Save</Menu.Item>
                 <Menu.Item leftSection={<DownloadIcon size={14} />}>
                   Download
                 </Menu.Item>
@@ -55,7 +56,6 @@ const Header: React.FC<HeaderProps> = ({
             </Menu>
             <Menu shadow="md" width={200}>
               <Menu.Target>
-                {/* 'compact' dihapus */}
                 <Button variant="subtle">
                   Edit
                 </Button>
@@ -67,7 +67,6 @@ const Header: React.FC<HeaderProps> = ({
             </Menu>
             <Menu shadow="md" width={200}>
               <Menu.Target>
-                {/* 'compact' dihapus */}
                 <Button variant="subtle">
                   View
                 </Button>
@@ -81,11 +80,9 @@ const Header: React.FC<HeaderProps> = ({
           </Group>
         </Group>
         <Group>
-          {/* 'compact' dihapus */}
           <Button variant="subtle" leftSection={<UndoIcon size={16} />}>
             Undo
           </Button>
-          {/* 'compact' dihapus */}
           <Button variant="subtle" leftSection={<RedoIcon size={16} />}>
             Redo
           </Button>
@@ -99,7 +96,8 @@ const Header: React.FC<HeaderProps> = ({
           </ActionIcon>
         </Group>
       </Group>
-    </Box>;
+    </Box>
+  );
 };
 
 export default Header;

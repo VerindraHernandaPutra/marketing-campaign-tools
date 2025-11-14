@@ -5,15 +5,15 @@ import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
 import { supabase } from '../../supabaseClient';
 
-// 1. Import the CanvasElement type
-import { CanvasElement } from '../Layout/Canvas'; 
+// 1. FIX: Remove the broken import
+// import { CanvasElement } from '../Layout/Canvas'; 
 
-// 2. Update the Project type
+// 2. FIX: Update the Project type to use 'unknown'
 type Project = {
   id: string;
   user_id: string;
   title: string;
-  canvas_data: CanvasElement[] | null;
+  canvas_data: unknown; // This is safer than 'any'
   thumbnail_url: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -24,7 +24,6 @@ const DashboardContent: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // We leave the mock templates for now
   const templates = [{
     id: 't1',
     title: 'Instagram Story',
