@@ -1,9 +1,21 @@
 import React, { useState } from 'react';
-import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme } from '@mantine/core';
-// 1. Import new icons
-import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, FileTextIcon, GridIcon, TableIcon, BoxIcon, HexagonIcon, MinusIcon } from 'lucide-react';
+// 1. FIX: Added imports for new components (TextInput, Button, Stack)
+import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, TextInput, Button, Stack } from '@mantine/core';
+// 2. FIX: Added/Removed icons
+import { 
+  ImageIcon, 
+  TypeIcon, 
+  SquareIcon, 
+  CircleIcon, 
+  TriangleIcon, 
+  FileTextIcon, 
+  BoxIcon, 
+  HexagonIcon, 
+  MinusIcon, 
+  BaselineIcon, // Added for Subheading
+  SparklesIcon  // Added for AI
+} from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
-// 2. Import new Fabric classes
 import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline } from 'fabric';
 
 interface SidebarProps {
@@ -14,9 +26,10 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
+  // 3. FIX: Add state for the AI prompt
+  const [aiPrompt, setAiPrompt] = useState('');
   const { canvas } = useFabricCanvas();
 
-  // 3. Update the shapeType to include new shapes
   const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line' | 'ellipse' | 'polygon' | 'polyline') => {
     if (!canvas) return;
     
@@ -29,7 +42,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
       height: 100,
     };
 
-    // 4. Add new cases for the new shapes
     switch (shapeType) {
       case 'rect':
         shape = new Rect(options);
@@ -52,35 +64,28 @@ const Sidebar: React.FC<SidebarProps> = () => {
         shape = new Ellipse({
           left: 100,
           top: 100,
-          rx: 75, // horizontal radius
-          ry: 50, // vertical radius
+          rx: 75,
+          ry: 50,
           fill: theme.colors.grape[4],
         });
         break;
-      case 'polygon': // We'll add a Hexagon
+      case 'polygon':
         shape = new Polygon([
-          { x: 50, y: 0 },
-          { x: 100, y: 25 },
-          { x: 100, y: 75 },
-          { x: 50, y: 100 },
-          { x: 0, y: 75 },
-          { x: 0, y: 25 }
+          { x: 50, y: 0 }, { x: 100, y: 25 }, { x: 100, y: 75 },
+          { x: 50, y: 100 }, { x: 0, y: 75 }, { x: 0, y: 25 }
         ], {
           left: 150,
           top: 150,
           fill: theme.colors.lime[4],
         });
         break;
-      case 'polyline': // We'll add a "Z" shape
+      case 'polyline':
         shape = new Polyline([
-          { x: 0, y: 0 },
-          { x: 100, y: 0 },
-          { x: 0, y: 100 },
-          { x: 100, y: 100 }
+          { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }, { x: 100, y: 100 }
         ], {
           left: 200,
           top: 200,
-          fill: '', // No fill for a line
+          fill: '',
           stroke: theme.colors.pink[4],
           strokeWidth: 4
         });
@@ -94,16 +99,22 @@ const Sidebar: React.FC<SidebarProps> = () => {
     }
   };
 
-  const addText = (textType: 'heading' | 'paragraph') => {
+  // 4. FIX: Updated 'addText' to include 'subheading'
+  const addText = (textType: 'heading' | 'subheading' | 'paragraph') => {
     if (!canvas) return;
     let text;
-    // ... (rest of addText function is unchanged)
+    
     switch (textType) {
       case 'heading':
         text = new Textbox('Heading', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 48, fontWeight: 'bold' });
         break;
+      // 5. FIX: Added 'subheading' option
+      case 'subheading':
+        text = new Textbox('Subheading', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 32, fontWeight: 'normal' });
+        break;
       case 'paragraph':
-        text = new Textbox('Paragraph text', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 24, width: 250 });
+        // 6. FIX: Reduced paragraph font size
+        text = new Textbox('Paragraph text', { left: 100, top: 100, fontFamily: 'Arial', fill: '#000000', fontSize: 16, width: 250 });
         break;
     }
     if (text) {
@@ -121,6 +132,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
       canvas.setActiveObject(rect);
       canvas.renderAll();
     }
+  };
+
+  // 7. FIX: Added placeholder for AI generation
+  const handleGenerateAI = () => {
+    alert(`AI Generation for prompt: "${aiPrompt}" is not implemented yet.`);
   };
 
   const ElementItem = ({
@@ -191,7 +207,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
             <Accordion.Item value="shapes">
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
-                {/* 5. Add the new ElementItems to the grid */}
                 <SimpleGrid cols={3} spacing="xs">
                   <ElementItem icon={SquareIcon} label="Square" onClick={() => addShape('rect')} />
                   <ElementItem icon={CircleIcon} label="Circle" onClick={() => addShape('circle')} />
@@ -203,34 +218,56 @@ const Sidebar: React.FC<SidebarProps> = () => {
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
+            
+            {/* 8. FIX: Updated Text section */}
             <Accordion.Item value="text">
               <Accordion.Control>Text</Accordion.Control>
               <Accordion.Panel>
-                <SimpleGrid cols={2} spacing="xs">
+                <SimpleGrid cols={3} spacing="xs">
                   <ElementItem icon={TypeIcon} label="Heading" onClick={() => addText('heading')} />
+                  <ElementItem icon={BaselineIcon} label="Subheading" onClick={() => addText('subheading')} />
                   <ElementItem icon={FileTextIcon} label="Paragraph" onClick={() => addText('paragraph')} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
+
+            {/* 9. FIX: Updated Media section (removed Grid) */}
             <Accordion.Item value="media">
               <Accordion.Control>Media</Accordion.Control>
               <Accordion.Panel>
-                <SimpleGrid cols={2} spacing="xs">
+                <SimpleGrid cols={3} spacing="xs">
                   <ElementItem icon={ImageIcon} label="Image" onClick={handleAddMedia} />
-                  <ElementItem icon={GridIcon} label="Grid" onClick={handleAddMedia} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
-            <Accordion.Item value="layouts">
-              <Accordion.Control>Layouts</Accordion.Control>
+
+            {/* 10. FIX: Added AI Generator section */}
+            <Accordion.Item value="ai">
+              <Accordion.Control icon={<SparklesIcon size={18} />}>
+                AI Generator
+              </Accordion.Control>
               <Accordion.Panel>
-                <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={LayoutIcon} label="Layout" onClick={handleAddMedia} />
-                  <ElementItem icon={TableIcon} label="Table" onClick={handleAddMedia} />
-                </SimpleGrid>
+                <Stack>
+                  <TextInput 
+                    placeholder="Describe an image to generate..."
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.currentTarget.value)}
+                  />
+                  <Button 
+                    onClick={handleGenerateAI} 
+                    leftSection={<SparklesIcon size={16} />}
+                  >
+                    Generate
+                  </Button>
+                </Stack>
               </Accordion.Panel>
             </Accordion.Item>
-          </Accordion> : <SimpleGrid cols={2} spacing="md">
+
+            {/* 11. FIX: Removed Layouts section */}
+
+          </Accordion> 
+          : 
+          <SimpleGrid cols={2} spacing="md">
             {Array(8).fill(0).map((_, i) => <div key={i} style={{
           height: 120,
           backgroundColor: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
