@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppShell, useMantineTheme } from '@mantine/core';
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
-import Canvas, { CanvasElement } from './Layout/Canvas'; // Import CanvasElement
+import CanvasComponent from './LayoutNext/Canvas'; // Renamed to avoid conflict
 import PropertiesPanel from './Layout/PropertiesPanel';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { Canvas, Object as FabricObject } from 'fabric';
 
-const mockElements: CanvasElement[] = [{
-    id: 'text-1',
-    type: 'text',
-    content: 'Click to edit this text',
-    position: { x: 100, y: 100 },
-    size: { width: 300, height: 50 },
-    style: { fontSize: 24, fontWeight: 'bold' }
-}];
+import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
+
 
 const CanvaEditor: React.FC = () => {
   const theme = useMantineTheme();
-  const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
-  const [elements, setElements] = useState<CanvasElement[]>([]);
+
+  const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [projectTitle, setProjectTitle] = useState('Loading...');
+
   const { projectId } = useParams<{ projectId: string }>();
+  
+  const projectDataRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
-
     const fetchProject = async () => {
       const { data, error } = await supabase
         .from('projects')
@@ -39,19 +37,23 @@ const CanvaEditor: React.FC = () => {
         console.error('Error fetching project', error);
       } else if (data) {
         setProjectTitle(data.title);
-        setElements(data.canvas_data || mockElements);
+        if (data.canvas_data) {
+          projectDataRef.current = JSON.stringify(data.canvas_data);
+        }
       }
     };
     fetchProject();
   }, [projectId]);
 
   const handleSaveProject = async () => {
-    if (!projectId) return;
+    if (!projectId || !canvas) return;
     
-    console.log('Saving project...', elements);
+    const canvasJson = canvas.toJSON(); 
+    console.log('Saving project...', canvasJson);
+    
     const { error } = await supabase
       .from('projects')
-      .update({ canvas_data: elements }) 
+      .update({ canvas_data: canvasJson }) 
       .eq('id', projectId);
 
     if (error) {
@@ -61,57 +63,71 @@ const CanvaEditor: React.FC = () => {
     }
   };
 
-  const handleElementSelect = (id: string | null) => {
-    setSelectedElement(id);
-    if (id && !propertiesPanelOpened) {
-      setPropertiesPanelOpened(true);
-    }
+  const contextValue: CanvasContextType = {
+    canvas,
+    selectedObject
   };
 
-  return <AppShell 
-    styles={{
-      main: {
-        background: `light-dark(${theme.colors.gray[0]}, ${theme.colors.dark[8]})`,
-        padding: 0
-      }
-    }} 
-    navbar={{
-      width: 300,
-      breakpoint: 'sm',
-      collapsed: { mobile: true, desktop: !sidebarOpened }
-    }} 
-    aside={{
-      width: 300,
-      breakpoint: 'sm',
-      collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedElement }
-    }} 
-    header={{
-      height: 60
-    }}
-  >
-      <AppShell.Header>
-        {/* --- THIS IS THE FIX --- */}
-        {/* Pass the functions and variables as props here */}
-        <Header 
-          projectTitle={projectTitle} 
-          onSave={handleSaveProject} 
-          sidebarOpened={sidebarOpened} 
-          onToggleSidebar={() => setSidebarOpened(!sidebarOpened)} 
-          propertiesPanelOpened={propertiesPanelOpened} 
-          onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
-        />
-        {/* ------------------------ */}
-      </AppShell.Header>
-      <AppShell.Navbar>
-        {sidebarOpened && <Sidebar opened={sidebarOpened} onToggle={() => setSidebarOpened(!sidebarOpened)} />}
-      </AppShell.Navbar>
-      <AppShell.Aside>
-        {propertiesPanelOpened && selectedElement && <PropertiesPanel opened={propertiesPanelOpened} onToggle={() => setPropertiesPanelOpened(!propertiesPanelOpened)} selectedElement={selectedElement} />}
-      </AppShell.Aside>
-      <AppShell.Main>
-        <Canvas onElementSelect={handleElementSelect} selectedElement={selectedElement} elements={elements} setElements={setElements}/>
-      </AppShell.Main>
-    </AppShell>;
+  return (
+    <CanvasContext.Provider value={contextValue}>
+      <AppShell 
+        styles={{
+          main: {
+            background: `light-dark(${theme.colors.gray[0]}, ${theme.colors.dark[8]})`,
+            padding: 0
+          }
+        }} 
+        navbar={{
+          width: 300,
+          breakpoint: 'sm',
+          collapsed: { mobile: true, desktop: !sidebarOpened }
+        }} 
+        aside={{
+          width: 300,
+          breakpoint: 'sm',
+          collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedObject }
+        }} 
+        header={{
+          height: 60
+        }}
+      >
+        <AppShell.Header>
+          <Header 
+            projectTitle={projectTitle} 
+            onSave={handleSaveProject} 
+            sidebarOpened={sidebarOpened} 
+            onToggleSidebar={() => setSidebarOpened(!sidebarOpened)} 
+            propertiesPanelOpened={propertiesPanelOpened} 
+            onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
+          />
+        </AppShell.Header>
+        
+        <AppShell.Navbar>
+          {sidebarOpened && <Sidebar opened={sidebarOpened} onToggle={() => setSidebarOpened(!sidebarOpened)} />}
+        </AppShell.Navbar>
+        
+        <AppShell.Aside>
+          {propertiesPanelOpened && selectedObject && (
+            <PropertiesPanel 
+              opened={propertiesPanelOpened} 
+              onToggle={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
+              // --- THIS IS THE FIX ---
+              // The 'selectedElement' prop is no longer needed or accepted
+              // ------------------------
+            />
+          )}
+        </AppShell.Aside>
+        
+        <AppShell.Main>
+          <CanvasComponent 
+            setCanvas={setCanvas}
+            setSelectedObject={setSelectedObject}
+            projectData={projectDataRef.current}
+          />
+        </AppShell.Main>
+      </AppShell>
+    </CanvasContext.Provider>
+  );
 };
 
 export default CanvaEditor;

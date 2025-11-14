@@ -1,37 +1,75 @@
 import React, { useState } from 'react';
-// MantineTheme ditambahkan
 import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme } from '@mantine/core';
 import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, FileTextIcon, GridIcon, TableIcon, BoxIcon } from 'lucide-react';
+// FIX: Import specific classes
+import { Textbox, Rect } from 'fabric'; 
+import { useFabricCanvas } from '../../context/CanvasContext';
 
 interface SidebarProps {
   opened: boolean;
   onToggle: () => void;
 }
 
-// Argumen diubah dari '({})' menjadi '()' untuk memperbaiki error 'no-empty-pattern'
-const Sidebar: React.FC<SidebarProps> = () => {
+const Sidebar: React.FC<SidebarProps> = (/* props */) => {
   const theme = useMantineTheme();
+  const { canvas } = useFabricCanvas();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
+
+  const handleAddElement = (type: 'text' | 'shape') => {
+    if (!canvas) return; 
+
+    if (type === 'text') {
+      // FIX: Use 'new Textbox'
+      const text = new Textbox('New Text', {
+        left: 50,
+        top: 50,
+        width: 200,
+        fontSize: 24,
+        fill: '#000',
+      });
+      canvas.add(text);
+      canvas.setActiveObject(text);
+    } else {
+      // FIX: Use 'new Rect'
+      const rect = new Rect({
+        left: 100,
+        top: 100,
+        width: 100,
+        height: 100,
+        fill: theme.colors.blue[4],
+      });
+      canvas.add(rect);
+      canvas.setActiveObject(rect);
+    }
+    canvas.renderAll();
+  };
+  
+  const handleAddImage = () => {
+    if (!canvas) return;
+    alert('Image/Grid/Layout adding not implemented yet. Adding a placeholder shape.');
+    handleAddElement('shape');
+  };
+  
   const ElementItem = ({
     icon: Icon,
-    label
+    label,
+    onClick
   }: {
-    // 'any' diubah menjadi 'React.ElementType'
     icon: React.ElementType;
     label: string;
+    onClick: () => void;
   }) => (
-    // 'sx' diubah menjadi 'style', 'theme' diberi tipe, dan '&:hover' dipindahkan ke 'className'
     <UnstyledButton 
-      className="hover:bg-gray-0 dark:hover:bg-dark-6" // Tailwind untuk hover
+      className="hover:bg-gray-0 dark:hover:bg-dark-6"
       style={(theme: MantineTheme) => ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         padding: theme.spacing.xs,
         borderRadius: theme.radius.md,
-        // 'theme.colorScheme' diganti dengan 'light-dark()'
         color: `light-dark(${theme.black}, ${theme.colors.dark[0]})`,
       })}
+      onClick={onClick}
     >
       <Icon size={24} />
       <Text size="xs" mt={4}>
@@ -42,9 +80,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
   
   return <Box p="md" w={300}>
       <Box mt="xs">
-        {/* 'position' diubah menjadi 'justify' */}
         <Group justify="center" mb="md">
-          {/* 'sx' diubah menjadi 'style', 'theme' diberi tipe, '&:hover' dipindahkan ke 'className', 'colorScheme' diganti 'light-dark()' */}
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
             style={(theme: MantineTheme) => ({
@@ -59,7 +95,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
           >
             <Text>Templates</Text>
           </UnstyledButton>
-          {/* 'sx' diubah menjadi 'style', 'theme' diberi tipe, '&:hover' dipindahkan ke 'className', 'colorScheme' diganti 'light-dark()' */}
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
             style={(theme: MantineTheme) => ({
@@ -83,10 +118,10 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={3} spacing="xs">
-                  <ElementItem icon={SquareIcon} label="Square" />
-                  <ElementItem icon={CircleIcon} label="Circle" />
-                  <ElementItem icon={TriangleIcon} label="Triangle" />
-                  <ElementItem icon={BoxIcon} label="Line" />
+                  <ElementItem icon={SquareIcon} label="Square" onClick={() => handleAddElement('shape')} />
+                  <ElementItem icon={CircleIcon} label="Circle" onClick={() => handleAddElement('shape')} />
+                  <ElementItem icon={TriangleIcon} label="Triangle" onClick={() => handleAddElement('shape')} />
+                  <ElementItem icon={BoxIcon} label="Line" onClick={() => handleAddElement('shape')} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -94,8 +129,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Text</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={TypeIcon} label="Heading" />
-                  <ElementItem icon={FileTextIcon} label="Paragraph" />
+                  <ElementItem icon={TypeIcon} label="Heading" onClick={() => handleAddElement('text')} />
+                  <ElementItem icon={FileTextIcon} label="Paragraph" onClick={() => handleAddElement('text')} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -103,8 +138,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Media</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={ImageIcon} label="Image" />
-                  <ElementItem icon={GridIcon} label="Grid" />
+                  <ElementItem icon={ImageIcon} label="Image" onClick={handleAddImage} />
+                  <ElementItem icon={GridIcon} label="Grid" onClick={handleAddImage} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
@@ -112,15 +147,14 @@ const Sidebar: React.FC<SidebarProps> = () => {
               <Accordion.Control>Layouts</Accordion.Control>
               <Accordion.Panel>
                 <SimpleGrid cols={2} spacing="xs">
-                  <ElementItem icon={LayoutIcon} label="Layout" />
-                  <ElementItem icon={TableIcon} label="Table" />
+                  <ElementItem icon={LayoutIcon} label="Layout" onClick={handleAddImage} />
+                  <ElementItem icon={TableIcon} label="Table" onClick={handleAddImage} />
                 </SimpleGrid>
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion> : <SimpleGrid cols={2} spacing="md">
             {Array(8).fill(0).map((_, i) => <div key={i} style={{
           height: 120,
-          // 'theme.colorScheme' diganti dengan 'light-dark()'
           backgroundColor: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
           borderRadius: theme.radius.md,
           display: 'flex',
