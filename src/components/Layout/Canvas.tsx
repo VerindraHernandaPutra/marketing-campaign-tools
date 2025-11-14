@@ -1,28 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { Paper, useMantineTheme, Center, Group, ActionIcon, Text } from '@mantine/core';
-import { ZoomInIcon, ZoomOutIcon, MousePointerIcon } from 'lucide-react';
-import { fabric } from 'fabric';
-import { useCanvas } from './CanvasContext';
+import { Paper, useMantineTheme, Center, Text } from '@mantine/core';
+import { Canvas as FabricCanvas, TPointerEventInfo } from 'fabric';
+
+// 1. FIX: Import hook from its new file
+import { useCanvas } from './useCanvas';
+// 2. FIX: Import type from the context definition file
+import { CanvasElement } from './CanvasContext';
+
 
 interface CanvasProps {
   onElementSelect: (id: string | null) => void;
   selectedElement: string | null;
-}
-
-interface CanvasElement {
-  id: string;
-  type: 'text' | 'shape';
-  content: string;
-  position: {
-    x: number;
-    y: number;
-  };
-  size: {
-    width: number;
-    height: number;
-  };
-  // 'any' diubah menjadi 'React.CSSProperties' untuk memperbaiki error ESLint
-  style?: React.CSSProperties;
 }
 
 const Canvas: React.FC<CanvasProps> = ({ onElementSelect }) => {
@@ -32,17 +20,19 @@ const Canvas: React.FC<CanvasProps> = ({ onElementSelect }) => {
 
   useEffect(() => {
     if (canvasRef.current) {
-      const canvas = new fabric.Canvas(canvasRef.current, {
+      const canvas = new FabricCanvas(canvasRef.current, {
         width: 850,
         height: 500,
         backgroundColor: `light-dark(${theme.white}, ${theme.colors.dark[8]})`,
       });
       setCanvas(canvas);
 
-      canvas.on('mouse:down', (options) => {
+      canvas.on('mouse:down', (options: TPointerEventInfo) => {
         if (options.target) {
-          setSelectedElement(options.target as any);
-          onElementSelect(options.target.id as string);
+          // 3. FIX: Cast to the imported 'CanvasElement' type
+          const selectedObject = options.target as CanvasElement;
+          setSelectedElement(selectedObject);
+          onElementSelect(selectedObject.id);
         } else {
           setSelectedElement(null);
           onElementSelect(null);
