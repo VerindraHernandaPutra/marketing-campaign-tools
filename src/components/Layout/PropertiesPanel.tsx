@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Slider, TextInput, Box } from '@mantine/core';
-// 1. FIX: Removed all the unused icons from this import
-// (AlignLeftIcon, AlignCenterIcon, etc., are all gone)
-
-// 2. Import the context hook and fabric (as default)
 import { useFabricCanvas } from '../../context/CanvasContext';
 import fabric from 'fabric';
 
 interface PropertiesPanelProps {
   opened: boolean;
   onToggle: () => void;
-  // 'selectedElement' prop is removed
 }
 
 // Helper function to check if object is a Textbox
@@ -23,10 +18,9 @@ const isShape = (obj: fabric.Object | null): obj is fabric.Rect => {
   return obj?.type === 'rect';
 };
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = (/* props */) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const { canvas, selectedObject } = useFabricCanvas();
   
-  // 3. FIX: Removed the unused [fill, setFill] state
   const [opacity, setOpacity] = useState(selectedObject?.get('opacity') || 1);
   const [text, setText] = useState(isTextbox(selectedObject) ? selectedObject.text : '');
   const [fontSize, setFontSize] = useState(isTextbox(selectedObject) ? selectedObject.fontSize : 24);
@@ -36,7 +30,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = (/* props */) => {
   // Sync local state when the selected object changes
   useEffect(() => {
     if (selectedObject) {
-      // 4. FIX: Removed setFill(...)
       setOpacity(selectedObject.get('opacity') || 1);
       setWidth(selectedObject.getScaledWidth());
       setHeight(selectedObject.getScaledHeight());
@@ -48,7 +41,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = (/* props */) => {
     }
   }, [selectedObject]);
 
-  // 5. FIX: Changed 'any' to be more specific
   const handlePropertyChange = (property: string, value: string | number | boolean | undefined) => {
     if (!canvas || !selectedObject) return;
     
@@ -56,7 +48,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = (/* props */) => {
     canvas.renderAll();
   };
 
-  // 6. FIX: Simplified handleFillChange, no longer uses local state
   const handleFillChange = (color: string) => {
     if (!canvas || !selectedObject) return;
     

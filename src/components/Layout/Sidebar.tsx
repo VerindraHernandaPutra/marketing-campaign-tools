@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme } from '@mantine/core';
 import { ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, LayoutIcon, FileTextIcon, GridIcon, TableIcon, BoxIcon } from 'lucide-react';
-// FIX: Import specific classes
-import { Textbox, Rect } from 'fabric'; 
+import { Textbox, Rect, Image } from 'fabric';
 import { useFabricCanvas } from '../../context/CanvasContext';
 
 interface SidebarProps {
@@ -10,16 +9,15 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = (/* props */) => {
+const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const { canvas } = useFabricCanvas();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
 
   const handleAddElement = (type: 'text' | 'shape') => {
-    if (!canvas) return; 
+    if (!canvas) return;
 
     if (type === 'text') {
-      // FIX: Use 'new Textbox'
       const text = new Textbox('New Text', {
         left: 50,
         top: 50,
@@ -30,7 +28,6 @@ const Sidebar: React.FC<SidebarProps> = (/* props */) => {
       canvas.add(text);
       canvas.setActiveObject(text);
     } else {
-      // FIX: Use 'new Rect'
       const rect = new Rect({
         left: 100,
         top: 100,
@@ -46,8 +43,33 @@ const Sidebar: React.FC<SidebarProps> = (/* props */) => {
   
   const handleAddImage = () => {
     if (!canvas) return;
-    alert('Image/Grid/Layout adding not implemented yet. Adding a placeholder shape.');
-    handleAddElement('shape');
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imgElement = document.createElement('img');
+        imgElement.src = event.target?.result as string;
+        imgElement.onload = () => {
+          const fabricImage = new Image(imgElement, {
+            left: 100,
+            top: 100,
+            scaleX: 0.5,
+            scaleY: 0.5,
+          });
+          canvas.add(fabricImage);
+          canvas.setActiveObject(fabricImage);
+          canvas.renderAll();
+        };
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   };
   
   const ElementItem = ({

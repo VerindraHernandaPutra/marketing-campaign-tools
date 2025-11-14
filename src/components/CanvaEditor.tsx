@@ -111,9 +111,6 @@ const CanvaEditor: React.FC = () => {
             <PropertiesPanel 
               opened={propertiesPanelOpened} 
               onToggle={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
-              // --- THIS IS THE FIX ---
-              // The 'selectedElement' prop is no longer needed or accepted
-              // ------------------------
             />
           )}
         </AppShell.Aside>
