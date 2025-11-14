@@ -85,8 +85,23 @@ const CanvaEditor: React.FC = () => {
     }
   };
 
+  const handleUpdateTitle = async (newTitle: string) => {
+    if (!projectId) return;
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ title: newTitle })
+      .eq('id', projectId);
+
+    if (error) {
+      alert('Error updating title: ' + error.message);
+    } else {
+      setProjectTitle(newTitle);
+    }
+  };
+
   const handleResize = (newDimensions: { width: number; height: number }) => {
-    setDimensions(newDimensions); 
+    setDimensions(newDimensions);
     setIsResizeModalOpen(false);
   };
 
@@ -180,7 +195,8 @@ const CanvaEditor: React.FC = () => {
       >
         <AppShell.Header>
           <Header 
-            projectTitle={projectTitle} 
+            projectTitle={projectTitle}
+            onUpdateTitle={handleUpdateTitle}
             onSave={handleSaveProject} 
             sidebarOpened={sidebarOpened} 
             onToggleSidebar={() => setSidebarOpened(!sidebarOpened)} 
