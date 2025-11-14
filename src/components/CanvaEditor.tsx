@@ -1,18 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { AppShell, useMantineTheme } from '@mantine/core';
+// 1. FIX: Removed 'useMantineTheme' from import
+import React, { useState, useEffect } from 'react';
+import { AppShell } from '@mantine/core'; // 'useMantineTheme' removed
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
-import CanvasComponent from './LayoutNext/Canvas'; // Renamed to avoid conflict
+import CanvasComponent from './LayoutNext/Canvas';
 import PropertiesPanel from './Layout/PropertiesPanel';
+import ResizeModal from './Layout/ResizeModal';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Canvas, Object as FabricObject } from 'fabric';
 
 import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
 
+type LoadedCanvasData = {
+  width?: number;
+  height?: number;
+  [key: string]: unknown;
+};
 
 const CanvaEditor: React.FC = () => {
-  const theme = useMantineTheme();
+  // 2. FIX: Removed 'theme' variable
+  // const theme = useMantineTheme();
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
 
@@ -20,9 +28,12 @@ const CanvaEditor: React.FC = () => {
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [projectTitle, setProjectTitle] = useState('Loading...');
 
+  const [dimensions, setDimensions] = useState({ width: 850, height: 500 });
+  const [isResizeModalOpen, setIsResizeModalOpen] = useState(false);
+
   const { projectId } = useParams<{ projectId: string }>();
   
-  const projectDataRef = useRef<string | null>(null);
+  const [projectData, setProjectData] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -38,7 +49,12 @@ const CanvaEditor: React.FC = () => {
       } else if (data) {
         setProjectTitle(data.title);
         if (data.canvas_data) {
-          projectDataRef.current = JSON.stringify(data.canvas_data);
+          const loadedData = data.canvas_data as LoadedCanvasData;
+          setProjectData(JSON.stringify(loadedData)); 
+          
+          if (loadedData.width && loadedData.height) {
+            setDimensions({ width: loadedData.width, height: loadedData.height });
+          }
         }
       }
     };
@@ -47,6 +63,9 @@ const CanvaEditor: React.FC = () => {
 
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
+    
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     
     const canvasJson = canvas.toJSON(); 
     console.log('Saving project...', canvasJson);
@@ -63,6 +82,11 @@ const CanvaEditor: React.FC = () => {
     }
   };
 
+  const handleResize = (newDimensions: { width: number; height: number }) => {
+    setDimensions(newDimensions); 
+    setIsResizeModalOpen(false);
+  };
+
   const contextValue: CanvasContextType = {
     canvas,
     selectedObject
@@ -73,8 +97,10 @@ const CanvaEditor: React.FC = () => {
       <AppShell 
         styles={{
           main: {
-            background: `light-dark(${theme.colors.gray[0]}, ${theme.colors.dark[8]})`,
-            padding: 0
+            padding: 0,
+            // 3. FIX: Explicitly set the main area's height to
+            // fill the viewport (100vh) minus the header (60px).
+            height: 'calc(100vh - 60px)',
           }
         }} 
         navbar={{
@@ -99,6 +125,7 @@ const CanvaEditor: React.FC = () => {
             onToggleSidebar={() => setSidebarOpened(!sidebarOpened)} 
             propertiesPanelOpened={propertiesPanelOpened} 
             onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
+            onToggleResizeModal={() => setIsResizeModalOpen(true)}
           />
         </AppShell.Header>
         
@@ -119,10 +146,19 @@ const CanvaEditor: React.FC = () => {
           <CanvasComponent 
             setCanvas={setCanvas}
             setSelectedObject={setSelectedObject}
-            projectData={projectDataRef.current}
+            projectData={projectData}
+            width={dimensions.width}
+            height={dimensions.height}
           />
         </AppShell.Main>
       </AppShell>
+      
+      <ResizeModal
+        opened={isResizeModalOpen}
+        onClose={() => setIsResizeModalOpen(false)}
+        onResize={handleResize}
+        currentDimensions={dimensions}
+      />
     </CanvasContext.Provider>
   );
 };

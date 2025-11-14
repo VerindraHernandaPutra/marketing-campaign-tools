@@ -1,6 +1,8 @@
-import React from 'react'; // Removed useState
-import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box } from '@mantine/core'; // Removed TextInput
-import { MenuIcon, SaveIcon, ShareIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon } from 'lucide-react';
+import React from 'react';
+import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box } from '@mantine/core';
+// 1. FIX: 'ResizeIcon' renamed to 'ExpandIcon'
+import { MenuIcon, SaveIcon, ShareIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon, ExpandIcon } from 'lucide-react';
+
 interface HeaderProps {
   sidebarOpened: boolean;
   onToggleSidebar: () => void;
@@ -8,19 +10,18 @@ interface HeaderProps {
   onTogglePropertiesPanel: () => void;
   projectTitle: string;
   onSave: () => void;
+  onToggleResizeModal: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onTogglePropertiesPanel,
-  projectTitle, // 3. FIX: Destructure props
-  onSave
+  projectTitle,
+  onSave,
+  onToggleResizeModal
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
-  // 4. FIX: Remove old context state
-  // const { canvasTitle, setCanvasTitle } = useCanvas();
-  // const [isEditingTitle, setIsEditingTitle] = useState(false);
 
   return (
     <Box p="xs" h={60}>
@@ -30,7 +31,6 @@ const Header: React.FC<HeaderProps> = ({
             <MenuIcon size={20} />
           </ActionIcon>
           
-          {/* 5. FIX: Use the 'projectTitle' prop */}
           <Title order={3} style={{ cursor: 'pointer' }}>
             {projectTitle}
           </Title>
@@ -44,8 +44,11 @@ const Header: React.FC<HeaderProps> = ({
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                {/* 6. FIX: Use the 'onSave' prop */}
                 <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>Save</Menu.Item>
+                {/* 2. FIX: Use 'ExpandIcon' here */}
+                <Menu.Item leftSection={<ExpandIcon size={14} />} onClick={onToggleResizeModal}>
+                  Resize
+                </Menu.Item>
                 <Menu.Item leftSection={<DownloadIcon size={14} />}>
                   Download
                 </Menu.Item>

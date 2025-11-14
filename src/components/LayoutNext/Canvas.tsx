@@ -1,35 +1,38 @@
-import React, { useEffect, useRef } from 'react';
-// 1. FIX: Rename the imported 'Canvas' to 'FabricCanvas'
-//    We also remove 'TEvent' since it's not used
-import { Canvas as FabricCanvas, Object as FabricObject } from 'fabric'; 
-import { Box } from '@mantine/core';
+import React, { useEffect, useRef, useState } from 'react';
+import { Canvas as FabricCanvas, Object as FabricObject } from 'fabric';
+// 1. FIX: Import 'useMantineTheme' to access theme colors
+import { Box, useMantineTheme } from '@mantine/core';
 
 interface CanvasProps {
-  // 2. FIX: Update the type to use 'FabricCanvas'
-  setCanvas: (canvas: FabricCanvas) => void;
+  setCanvas: (canvas: FabricCanvas | null) => void;
   setSelectedObject: (obj: FabricObject | null) => void;
   projectData: string | null;
+  width: number;
+  height: number;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ setCanvas, setSelectedObject, projectData }) => {
+const Canvas: React.FC<CanvasProps> = ({
+  setCanvas,
+  setSelectedObject,
+  projectData,
+  width,
+  height,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [localCanvas, setLocalCanvas] = useState<FabricCanvas | null>(null);
+  // 2. FIX: Get the theme object
+  const theme = useMantineTheme();
 
+  // Effect to initialize the canvas ONCE
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // 3. FIX: Use 'new FabricCanvas'
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 850,
-      height: 500,
-      backgroundColor: 'white',
+      width: width,
+      height: height,
+      backgroundColor: 'white', // The canvas itself is always white
       devicePixelRatio: window.devicePixelRatio,
     });
-
-    if (projectData) {
-      canvas.loadFromJSON(projectData, () => {
-        canvas.renderAll();
-      });
-    }
 
     const handleSelection = (options: { selected?: FabricObject[] }) => {
       if (options.selected && options.selected.length > 0) {
@@ -48,18 +51,54 @@ const Canvas: React.FC<CanvasProps> = ({ setCanvas, setSelectedObject, projectDa
     canvas.on('selection:cleared', handleSelectionCleared);
 
     setCanvas(canvas);
+    setLocalCanvas(canvas);
 
     return () => {
       canvas.off('selection:created', handleSelection);
       canvas.off('selection:updated', handleSelection);
       canvas.off('selection:cleared', handleSelectionCleared);
       canvas.dispose();
+      setCanvas(null);
+      setLocalCanvas(null);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Runs once on mount
+
+  // Effect to LOAD DATA when it arrives
+  useEffect(() => {
+    if (localCanvas && projectData) {
+      localCanvas.loadFromJSON(projectData, () => {
+        localCanvas.renderAll();
+      });
+    }
+  }, [localCanvas, projectData]);
+
+  // Effect to RESIZE canvas when props change
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.width = width;
+      canvasRef.current.height = height;
+    }
+    if (localCanvas) {
+      localCanvas.setWidth(width);
+      localCanvas.setHeight(height);
+      localCanvas.calcOffset();
+      localCanvas.renderAll();
+    }
+  }, [localCanvas, width, height]);
 
   return (
-    <Box style={{ flex: 1, display: 'grid', placeItems: 'center', background: '#f0f0f0' }}>
+    // 3. FIX: Change 'flex: 1' to 'height: 100%'
+    // 4. FIX: Use a theme-aware background color for the centering box
+    <Box
+      style={{
+        height: '100%',
+        display: 'grid',
+        placeItems: 'center',
+        background: `light-dark(${theme.colors.gray[1]}, ${theme.colors.dark[9]})`,
+      }}
+    >
+      {/* This is the white <canvas> element */}
       <canvas ref={canvasRef} />
     </Box>
   );
