@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Slider, TextInput, Box } from '@mantine/core';
+// 1. FIX: Import 'Slider' and 'ColorInput'
+import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Button, TextInput, Box, Slider, ColorInput } from '@mantine/core';
 import { useFabricCanvas } from '../../context/CanvasContext';
-// 1. Import new Fabric classes
 import { Object as FabricObject, Textbox, Rect, Circle, Triangle, Line, Ellipse, Polygon, Polyline } from 'fabric';
+import { RotateCcwIcon, RotateCwIcon } from 'lucide-react';
 
 interface PropertiesPanelProps {
   opened: boolean;
   onToggle: () => void;
-  // selectedElement prop is removed
 }
 
 const isTextbox = (obj: FabricObject | null): obj is Textbox => {
   return obj?.type === 'textbox' || obj?.type === 'i-text';
 };
 
-// 2. FIX: Update isShape to include all our new types
 const isShape = (obj: FabricObject | null): obj is (Rect | Circle | Triangle | Line | Ellipse | Polygon | Polyline) => {
   if (!obj) return false;
   return ['rect', 'circle', 'triangle', 'line', 'ellipse', 'polygon', 'polyline'].includes(obj.type || '');
@@ -29,12 +28,24 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const [fontSize, setFontSize] = useState(isTextbox(selectedObject) ? selectedObject.fontSize : 24);
   const [width, setWidth] = useState(selectedObject?.getScaledWidth() || 100);
   const [height, setHeight] = useState(selectedObject?.getScaledHeight() || 100);
+  const [angle, setAngle] = useState(selectedObject?.get('angle') || 0);
+
+  // 2. FIX: Add state for new properties
+  const [fillColor, setFillColor] = useState(selectedObject?.get('fill') as string || '#000000');
+  const [strokeColor, setStrokeColor] = useState(selectedObject?.get('stroke') as string || '#000000');
+  const [strokeWidth, setStrokeWidth] = useState(selectedObject?.get('strokeWidth') || 0);
 
   useEffect(() => {
     if (selectedObject) {
       setOpacity(selectedObject.get('opacity') || 1);
       setWidth(selectedObject.getScaledWidth());
       setHeight(selectedObject.getScaledHeight());
+      setAngle(selectedObject.get('angle') || 0);
+
+      // 3. FIX: Load new properties when selected object changes
+      setFillColor(selectedObject.get('fill') as string || '#000000');
+      setStrokeColor(selectedObject.get('stroke') as string || '#000000');
+      setStrokeWidth(selectedObject.get('strokeWidth') || 0);
 
       if (isTextbox(selectedObject)) {
         setText(selectedObject.text || '');
@@ -47,18 +58,32 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
     if (!canvas || !selectedObject) return;
     
     selectedObject.set(property, value);
+
+    if (property === 'angle') {
+      setAngle(Number(value) || 0);
+    }
+    // 4. FIX: Sync stroke width state
+    if (property === 'strokeWidth') {
+      setStrokeWidth(Number(value) || 0);
+    }
+    
+    selectedObject.setCoords();
     canvas.renderAll();
   };
 
+  // 5. FIX: Simplify Fill handler
   const handleFillChange = (color: string) => {
     if (!canvas || !selectedObject) return;
+    setFillColor(color);
+    selectedObject.set('fill', color);
+    canvas.renderAll();
+  };
 
-    // Polyline and Line don't have 'fill', they have 'stroke'
-    if (selectedObject.type === 'line' || selectedObject.type === 'polyline') {
-      selectedObject.set('stroke', color);
-    } else {
-      selectedObject.set('fill', color);
-    }
+  // 6. FIX: Add new Stroke Color handler
+  const handleStrokeChange = (color: string) => {
+    if (!canvas || !selectedObject) return;
+    setStrokeColor(color);
+    selectedObject.set('stroke', color);
     canvas.renderAll();
   };
   
@@ -92,13 +117,40 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
     if (!canvas || !selectedObject) return;
 
     const numValue = Number(value);
+
     if (dim === 'width') {
       setWidth(numValue);
-      selectedObject.scaleToWidth(numValue);
+      if (selectedObject.width) {
+        selectedObject.set('scaleX', numValue / selectedObject.width);
+      }
     } else {
       setHeight(numValue);
-      selectedObject.scaleToHeight(numValue);
+      if (selectedObject.height) {
+        selectedObject.set('scaleY', numValue / selectedObject.height);
+      }
     }
+    
+    selectedObject.setCoords();
+    canvas.renderAll();
+  };
+
+  const handleRotate = (direction: 'left' | 'right') => {
+    if (!canvas || !selectedObject) return;
+
+    const currentAngle = angle;
+    let newAngle;
+
+    if (direction === 'right') {
+      newAngle = currentAngle + 90;
+    } else {
+      newAngle = currentAngle - 90;
+    }
+
+    newAngle = (newAngle + 360) % 360;
+
+    setAngle(newAngle);
+    selectedObject.set('angle', newAngle);
+    selectedObject.setCoords();
     canvas.renderAll();
   };
 
@@ -160,23 +212,51 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
             </div>
             <div>
               <Text size="xs" fw={500} mb={4}>Rotation</Text>
-              <Slider 
-                value={selectedObject.angle || 0}
-                onChange={(val) => handlePropertyChange('angle', val)}
-                min={0} max={360}
+              <NumberInput 
+                value={Math.round(angle)}
+                onChange={(val) => handlePropertyChange('angle', Number(val))}
+                min={0}
+                max={360}
+                step={1}
+                suffix="°"
               />
+            </div>
+            <div>
+              <Text size="xs" fw={500} mb={4}>Rotate</Text>
+              <Group grow>
+                <Button 
+                  variant="default" 
+                  leftSection={<RotateCcwIcon size={16} />}
+                  onClick={() => handleRotate('left')}
+                >
+                  Left
+                </Button>
+                <Button 
+                  variant="default" 
+                  leftSection={<RotateCwIcon size={16} />}
+                  onClick={() => handleRotate('right')}
+                >
+                  Right
+                </Button>
+              </Group>
             </div>
           </Stack>
         )}
 
         <Divider my="md" />
         
+        {/* 7. FIX: Updated Fill Color section */}
         <div>
           <Text size="xs" fw={500} mb={4}>
-            {/* 3. FIX: Change label for lines/polylines */}
-            {selectedObject.type === 'line' || selectedObject.type === 'polyline' ? 'Stroke Color' : 'Fill Color'}
+            Fill Color
           </Text>
-          <Group gap="xs">
+          <ColorInput
+            value={fillColor}
+            onChange={handleFillChange}
+            format="hex"
+            placeholder="Custom color"
+          />
+          <Group gap="xs" mt="xs">
             {colors.map(color => (
               <ColorSwatch 
                 key={color} 
@@ -188,13 +268,51 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
             ))}
           </Group>
         </div>
+
+        {/* 8. FIX: Added new Border/Stroke section */}
+        <Stack gap="md" mt="md">
+          <Divider />
+          <div>
+            <Text size="xs" fw={500} mb={4}>Border Color</Text>
+            <ColorInput
+              value={strokeColor}
+              onChange={handleStrokeChange}
+              format="hex"
+              placeholder="Custom color"
+            />
+            <Group gap="xs" mt="xs">
+              {colors.map(color => (
+                <ColorSwatch
+                  key={color}
+                  color={color}
+                  size={22}
+                  style={{ cursor: 'pointer', border: color === 'transparent' ? '1px solid #ccc' : 'none' }}
+                  onClick={() => handleStrokeChange(color)}
+                />
+              ))}
+            </Group>
+          </div>
+          <div>
+            <Text size="xs" fw={500} mb={4}>Border Width</Text>
+            <NumberInput
+              value={strokeWidth}
+              onChange={(val) => handlePropertyChange('strokeWidth', val)}
+              min={0}
+              step={1}
+            />
+          </div>
+        </Stack>
         
+        {/* 9. FIX: Kept Opacity as a Slider */}
         <div className="mt-4">
+          <Divider my="md" />
           <Text size="xs" fw={500} mb={4}>Opacity</Text>
           <Slider 
             value={opacity} 
             onChange={handleOpacityChange} 
-            min={0} max={1} step={0.01} 
+            min={0} 
+            max={1} 
+            step={0.01} 
             label={(value) => `${Math.round(value * 100)}%`}
           />
         </div>
