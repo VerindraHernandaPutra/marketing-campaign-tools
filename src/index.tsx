@@ -1,17 +1,17 @@
 import React from 'react';
 import './index.css';
-import { createRoot } from 'react-dom/client'; 
+import { createRoot } from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import '@mantine/core/styles.css';
 import { AuthProvider } from './auth/AuthProvider';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, ColorSchemeScript } from '@mantine/core';
 
 const container = document.getElementById('root');
-const root = createRoot(container!); 
+const root = createRoot(container!);
 
 root.render(
   <React.StrictMode>
-    <MantineProvider theme={{}}>
+    <MantineProvider>
       <AuthProvider>
         <AppRouter />
       </AuthProvider>
