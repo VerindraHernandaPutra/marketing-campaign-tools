@@ -14,7 +14,7 @@ const CampaignForm: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [platformData, setPlatformData] = useState<Record<string, any>>({});
+  const [platformData, setPlatformData] = useState<Record<string, Record<string, any>>>({});
 
   const handleFileChange = (newFiles: File[]) => {
     setFiles([...files, ...newFiles]);
@@ -38,21 +38,48 @@ const CampaignForm: React.FC = () => {
   const nextStep = () => setActiveStep((current) => (current < 3 ? current + 1 : current));
   const prevStep = () => setActiveStep((current) => (current > 0 ? current - 1 : current));
 
+  const handlePlatformDataChange = (platform: string, data: Record<string, any>) => {
+    setPlatformData((prev) => ({
+      ...prev,
+      [platform]: data,
+    }));
+  };
+
   const renderFlow = () => {
-    const props = {
-      data: platformData,
-      onChange: setPlatformData,
-    };
+    const flows = [];
     if (selectedPlatforms.includes('whatsapp')) {
-      return <WhatsappFlow {...props} />;
+      flows.push(
+        <WhatsappFlow
+          key="whatsapp"
+          data={platformData.whatsapp || {}}
+          onChange={(data) => handlePlatformDataChange('whatsapp', data)}
+        />
+      );
     }
     if (selectedPlatforms.includes('email')) {
-      return <EmailFlow {...props} />;
+      flows.push(
+        <EmailFlow
+          key="email"
+          data={platformData.email || {}}
+          onChange={(data) => handlePlatformDataChange('email', data)}
+        />
+      );
     }
     if (selectedPlatforms.some((p) => ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p))) {
-      return <SocialMediaFlow {...props} />;
+      flows.push(
+        <SocialMediaFlow
+          key="social"
+          data={platformData.social || {}}
+          onChange={(data) => handlePlatformDataChange('social', data)}
+        />
+      );
     }
-    return <Text>Please select a platform to configure.</Text>;
+
+    if (flows.length === 0) {
+      return <Text>Please select a platform to configure.</Text>;
+    }
+
+    return flows;
   };
 
   return (

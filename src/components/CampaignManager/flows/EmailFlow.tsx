@@ -7,12 +7,8 @@ interface EmailFlowProps {
 }
 
 const EmailFlow: React.FC<EmailFlowProps> = ({ data, onChange }) => {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...data, [e.currentTarget.name]: e.currentTarget.value });
-  };
-
   return (
-    <Box>
+    <Box mb="md">
       <Text fw={500} mb="md">Email Campaign Configuration</Text>
       <TextInput
         label="Subject Line"
@@ -20,7 +16,7 @@ const EmailFlow: React.FC<EmailFlowProps> = ({ data, onChange }) => {
         required
         name="subject"
         value={data.subject || ''}
-        onChange={handleChange}
+        onChange={(e) => onChange({ ...data, subject: e.currentTarget.value })}
       />
       <TextInput
         label="From Address"
@@ -29,7 +25,7 @@ const EmailFlow: React.FC<EmailFlowProps> = ({ data, onChange }) => {
         mt="md"
         name="fromAddress"
         value={data.fromAddress || ''}
-        onChange={handleChange}
+        onChange={(e) => onChange({ ...data, fromAddress: e.currentTarget.value })}
       />
     </Box>
   );
