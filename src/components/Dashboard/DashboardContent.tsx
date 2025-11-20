@@ -1,28 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader } from '@mantine/core';
 import { LayoutIcon, ImageIcon, FileTextIcon } from 'lucide-react';
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
 import { supabase } from '../../supabaseClient';
+import { useAuth } from '../../auth/useAuth';
 
-// 1. FIX: Remove the broken import
-// import { CanvasElement } from '../Layout/Canvas'; 
-
-// 2. FIX: Update the Project type to use 'unknown'
 type Project = {
   id: string;
   user_id: string;
   title: string;
-  canvas_data: unknown; // This is safer than 'any'
+  canvas_data: unknown; 
   thumbnail_url: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 const DashboardContent: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string | null>('recent');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const fetchRecentProjects = useCallback(async () => {
+      if (!user) return;
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching recent projects:', error);
+      } else if (data) {
+        setProjects(data);
+      }
+      setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'recent') {
+      fetchRecentProjects();
+    }
+  }, [activeTab, fetchRecentProjects]); 
 
   const templates = [{
     id: 't1',
@@ -46,35 +67,13 @@ const DashboardContent: React.FC = () => {
     category: 'Document'
   }];
 
-  useEffect(() => {
-    const fetchRecentProjects = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('updated_at', { ascending: false }) 
-        .limit(4); 
-
-      if (error) {
-        console.error('Error fetching recent projects:', error);
-      } else if (data) {
-        setProjects(data);
-      }
-      setLoading(false);
-    };
-
-    if (activeTab === 'recent') {
-      fetchRecentProjects();
-    }
-  }, [activeTab]); 
-
   return <Box className="py-8">
       <Container size="xl">
         <Box mb="xl">
           <Title order={2} mb="xs">
             Start creating
           </Title>
-          <Text color="dimmed" size="sm" mb="lg">
+          <Text c="dimmed" size="sm" mb="lg">
             Choose a template or start from scratch
           </Text>
           <SimpleGrid 
@@ -93,14 +92,13 @@ const DashboardContent: React.FC = () => {
           <Tabs.List>
             <Tabs.Tab value="recent">Recent designs</Tabs.Tab>
             <Tabs.Tab value="templates">Templates</Tabs.Tab>
-            <Tabs.Tab value="folders">Folders</Tabs.Tab>
           </Tabs.List>
           
           <Tabs.Panel value="recent" pt="xl">
             <Group justify="space-between" mb="md">
               <Title order={3}>Your designs</Title>
-              <Button variant="subtle" size="sm">
-                View all
+              <Button variant="subtle" size="sm" onClick={fetchRecentProjects}>
+                Refresh
               </Button>
             </Group>
             
@@ -113,15 +111,18 @@ const DashboardContent: React.FC = () => {
                 cols={{ base: 2, sm: 3, md: 4 }} 
                 spacing="lg"
               >
+                {projects.length === 0 && <Text c="dimmed">No projects found. Create one above!</Text>}
                 {projects.map(project => (
                   <DesignCard 
                     key={project.id} 
                     design={{
                       id: project.id,
                       title: project.title,
-                      thumbnail: project.thumbnail_url || 'https://images.unsplash.com/photo-1618005182384-a83a-8bd57fbe?w=400',
-                      updated_at: project.updated_at
-                    }} 
+                      thumbnail: project.thumbnail_url || '',
+                      updated_at: project.updated_at,
+                      canvas_data: project.canvas_data
+                    }}
+                    onRefresh={fetchRecentProjects}
                   />
                 ))}
               </SimpleGrid>
@@ -131,9 +132,6 @@ const DashboardContent: React.FC = () => {
           <Tabs.Panel value="templates" pt="xl">
             <Group justify="space-between" mb="md">
               <Title order={3}>Popular templates</Title>
-              <Button variant="subtle" size="sm">
-                View all
-              </Button>
             </Group>
             <SimpleGrid 
               cols={{ base: 2, sm: 3, md: 4 }} 
@@ -141,14 +139,6 @@ const DashboardContent: React.FC = () => {
             >
               {templates.map(template => <DesignCard key={template.id} design={template} isTemplate />)}
             </SimpleGrid>
-          </Tabs.Panel>
-          <Tabs.Panel value="folders" pt="xl">
-            <Box className="text-center py-12">
-              <Text color="dimmed">No folders yet</Text>
-              <Button variant="subtle" mt="md">
-                Create your first folder
-              </Button>
-            </Box>
           </Tabs.Panel>
         </Tabs>
       </Container>

@@ -1,7 +1,10 @@
 import React from 'react';
-import { Paper, Text, Group, ActionIcon, Menu, Image, Box, UnstyledButton, Badge } from '@mantine/core';
+import { Paper, Text, Group, ActionIcon, Menu, Image, Box, UnstyledButton, Badge, LoadingOverlay } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { MoreVerticalIcon, TrashIcon, CopyIcon, FolderIcon, ShareIcon, DownloadIcon } from 'lucide-react';
+import { MoreVerticalIcon, TrashIcon, CopyIcon, DownloadIcon } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
+import { useAuth } from '../../auth/useAuth';
+
 interface DesignCardProps {
   design: {
     id: string;
@@ -9,11 +12,12 @@ interface DesignCardProps {
     thumbnail: string;
     updated_at?: string | null;
     category?: string;
+    canvas_data?: unknown; // Fix: Use unknown instead of any
   };
   isTemplate?: boolean;
+  onRefresh?: () => void;
 }
 
-// 2. This function IS used now
 function timeAgo(dateString: string | null | undefined): string {
   if (!dateString) return 'just now';
   const date = new Date(dateString);
@@ -33,25 +37,101 @@ function timeAgo(dateString: string | null | undefined): string {
 
 const DesignCard: React.FC<DesignCardProps> = ({
   design,
-  isTemplate
+  isTemplate,
+  onRefresh
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loading, setLoading] = React.useState(false);
 
-  // 3. This function IS used now
   const handleClick = () => {
     if (isTemplate) {
-      // Handle template creation (we can build this next)
-      // e.g., create a new project based on this template
+      // Template logic
     } else {
       navigate(`/editor/${design.id}`);
     }
   };
 
-  return <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-      {/* 4. Attach handleClick to the onClick prop */}
+  const handleDuplicate = async () => {
+    if (!user || isTemplate) return;
+    setLoading(true);
+    try {
+      const { data: original } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', design.id)
+        .single();
+
+      if (original) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const originalData = original as any;
+        
+        const { error } = await supabase.from('projects').insert({
+            user_id: user.id,
+            title: `${originalData.title} (Copy)`,
+            canvas_data: originalData.canvas_data,
+            thumbnail_url: originalData.thumbnail_url
+        });
+        
+        if (error) throw error;
+        if (onRefresh) onRefresh();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      alert('Error duplicating project: ' + message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isTemplate) return;
+    if (!confirm('Are you sure you want to delete this project?')) return;
+    
+    setLoading(true);
+    const { error } = await supabase.from('projects').delete().eq('id', design.id);
+    setLoading(false);
+
+    if (error) {
+      alert('Error deleting: ' + error.message);
+    } else {
+      if (onRefresh) onRefresh();
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!design.thumbnail) {
+      alert("No thumbnail available to download.");
+      return;
+    }
+    
+    try {
+      const response = await fetch(design.thumbnail);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${design.title}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download image.');
+    }
+  };
+
+  return <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" withBorder pos="relative">
+      <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
       <UnstyledButton onClick={handleClick} className="w-full">
         <Box className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
-          <Image src={design.thumbnail} alt={design.title} fit="cover" className="w-full h-full" />
+          <Image 
+            src={design.thumbnail || 'https://placehold.co/600x400?text=No+Preview'} 
+            alt={design.title} 
+            fit="cover" 
+            className="w-full h-full" 
+          />
           {isTemplate && <Badge className="absolute top-2 right-2" color="purple" variant="filled" size="sm">
               Template
             </Badge>}
@@ -65,40 +145,39 @@ const DesignCard: React.FC<DesignCardProps> = ({
             </Text>
 
             {design.updated_at && !isTemplate && (
-              <Text size="xs" color="dimmed" mt={2}>
+              <Text size="xs" c="dimmed" mt={2}>
                 Edited {timeAgo(design.updated_at)}
               </Text>
             )}
 
             {design.category && isTemplate && (
-              <Text size="xs" color="dimmed" mt={2}>
+              <Text size="xs" c="dimmed" mt={2}>
                 {design.category}
               </Text>
             )}
           </Box>
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <ActionIcon variant="subtle" onClick={e => e.stopPropagation()}>
-                <MoreVerticalIcon size={16} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item leftSection={<CopyIcon size={14} />}>
-                Make a copy
-              </Menu.Item>
-              <Menu.Item leftSection={<ShareIcon size={14} />}>Share</Menu.Item>
-              <Menu.Item leftSection={<DownloadIcon size={14} />}>
-                Download
-              </Menu.Item>
-              <Menu.Item leftSection={<FolderIcon size={14} />}>
-                Move to folder
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item leftSection={<TrashIcon size={14} />} color="red">
-                Delete
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          
+          {!isTemplate && (
+            <Menu shadow="md" width={200} position="bottom-end">
+                <Menu.Target>
+                <ActionIcon variant="subtle" onClick={e => e.stopPropagation()}>
+                    <MoreVerticalIcon size={16} />
+                </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                <Menu.Item leftSection={<CopyIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}>
+                    Duplicate
+                </Menu.Item>
+                <Menu.Item leftSection={<DownloadIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleDownload(); }}>
+                    Download
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>
+                    Delete
+                </Menu.Item>
+                </Menu.Dropdown>
+            </Menu>
+          )}
         </Group>
       </Box>
     </Paper>;
