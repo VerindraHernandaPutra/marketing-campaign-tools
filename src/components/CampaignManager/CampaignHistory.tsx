@@ -33,7 +33,7 @@ const CampaignHistory: React.FC = () => {
     if (confirm('Are you sure you want to delete this campaign?')) {
       const { error } = await supabase.from('marketing_campaigns').delete().eq('id', id);
       if (!error) {
-        fetchHistory(); // Refresh list
+        fetchHistory(); 
       } else {
         alert('Error deleting campaign');
       }
@@ -50,6 +50,20 @@ const CampaignHistory: React.FC = () => {
       }
   };
 
+  // Helper to format date and time
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    // Ensures we interpret the UTC string as local time for display
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short', // e.g., Nov
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false // Changed to false for 24h format
+    });
+  };
+
   if (loading) return <Loader />;
 
   return (
@@ -61,7 +75,7 @@ const CampaignHistory: React.FC = () => {
             <Table.Th>Title</Table.Th>
             <Table.Th>Platforms</Table.Th>
             <Table.Th>Status</Table.Th>
-            <Table.Th>Date</Table.Th>
+            <Table.Th>Date & Time</Table.Th> 
             <Table.Th>Actions</Table.Th>
           </Table.Tr>
         </Table.Thead>
@@ -78,7 +92,9 @@ const CampaignHistory: React.FC = () => {
               <Table.Td>
                  <Badge color={getStatusColor(c.status)}>{c.status?.toUpperCase()}</Badge>
               </Table.Td>
-              <Table.Td>{new Date(c.created_at).toLocaleDateString()}</Table.Td>
+              <Table.Td>
+                  {formatDate(c.scheduled_date || c.created_at)}
+              </Table.Td>
               <Table.Td>
                 <Group gap="xs">
                   <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/campaign-manager/edit/${c.id}`)}>

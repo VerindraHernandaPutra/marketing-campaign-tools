@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css'; 
-import { UploadIcon, SendIcon, ClockIcon, UsersIcon, SaveIcon, XIcon } from 'lucide-react';
+import { UploadIcon, SendIcon, ClockIcon, UsersIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -23,15 +23,14 @@ const CampaignForm: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   
-  // State for NEW files to be uploaded
   const [files, setFiles] = useState<File[]>([]);
-  // State for EXISTING media URLs (from database)
   const [existingMedia, setExistingMedia] = useState<string[]>([]);
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [platformData, setPlatformData] = useState<Record<string, Record<string, any>>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   
   const [groups, setGroups] = useState<{value: string, label: string}[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -40,7 +39,6 @@ const CampaignForm: React.FC = () => {
   const [currentSendingIndex, setCurrentSendingIndex] = useState(0);
   const [isSendingSessionActive, setIsSendingSessionActive] = useState(false);
 
-  // Fetch Groups
   useEffect(() => {
     const fetchGroups = async () => {
       if (!user) return;
@@ -52,7 +50,6 @@ const CampaignForm: React.FC = () => {
     fetchGroups();
   }, [user]);
 
-  // Fetch Campaign Logic
   useEffect(() => {
     const fetchCampaign = async () => {
       if (!campaignId || !user) return;
@@ -66,11 +63,13 @@ const CampaignForm: React.FC = () => {
       
       if (error) {
         console.error("Error fetching campaign:", error);
+        alert("Could not load campaign.");
       } else if (data) {
         setTitle(data.title);
         setContent(data.content || '');
         setSelectedPlatforms(data.platforms || []);
         if (data.scheduled_date) {
+            // Ensure this is a Date object
             setScheduledDate(new Date(data.scheduled_date));
         }
         if (data.platform_data) {
@@ -78,7 +77,6 @@ const CampaignForm: React.FC = () => {
             if (data.platform_data.target_group_id) {
                 setSelectedGroupId(data.platform_data.target_group_id);
             }
-            // FIX: Load existing media URLs
             if (Array.isArray(data.platform_data.media)) {
                 setExistingMedia(data.platform_data.media);
             }
@@ -99,9 +97,65 @@ const CampaignForm: React.FC = () => {
     setFiles(files.filter((_, i) => i !== index));
   };
   
-  // New helper to remove existing media URLs
   const removeExistingMedia = (index: number) => {
     setExistingMedia(existingMedia.filter((_, i) => i !== index));
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // --- AI GENERATION LOGIC ---
+  const handleGenerateContent = async () => {
+    let imageToAnalyze: string | null = null;
+
+    if (files.length > 0) {
+        imageToAnalyze = await fileToBase64(files[0]);
+    } else if (existingMedia.length > 0) {
+        alert("For AI generation, please upload a new image file directly. Analyzing existing URLs is currently limited.");
+        return;
+    }
+
+    if (!imageToAnalyze) {
+        alert("Please upload an image first so the AI can analyze it!");
+        return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+        const audienceContext = selectedGroupId 
+          ? `Audience Group: ${groups.find(g => g.value === selectedGroupId)?.label}` 
+          : "General Audience";
+
+        const { data, error } = await supabase.functions.invoke('generate-caption', {
+            body: { 
+                imageBase64: imageToAnalyze,
+                context: audienceContext
+            }
+        });
+
+        if (error) throw error;
+
+        if (data) {
+            if (data.title) setTitle(data.title);
+            if (data.content) setContent(data.content);
+        }
+    } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+        console.error("AI Generation failed:", error);
+        const msg = error.message || "Failed to generate content.";
+        alert("AI Error: " + msg);
+    } finally {
+        setIsGeneratingAI(false);
+    }
   };
   
   const getClientsFromGroup = async (groupId: string) => {
@@ -117,7 +171,6 @@ const CampaignForm: React.FC = () => {
   };
 
   const startWhatsappBulkSession = async () => {
-    // ... (No changes to whatsapp logic)
     let numbers: string[] = [];
     if (selectedGroupId) {
        const clients = await getClientsFromGroup(selectedGroupId);
@@ -150,21 +203,7 @@ const CampaignForm: React.FC = () => {
     setCurrentSendingIndex(prev => prev + 1);
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-
   const sendEmail = async (forceImmediate = false) => {
-    // ... (Recipients logic same as before)
     let recipients: string[] = [];
     if (selectedGroupId) {
         const clients = await getClientsFromGroup(selectedGroupId);
@@ -181,11 +220,10 @@ const CampaignForm: React.FC = () => {
       let scheduledAtISO = null;
       
       if (!forceImmediate && scheduledDate) {
-        // ... (Schedule logic same as before)
         const dateObj = new Date(scheduledDate);
         const now = new Date();
         const maxDate = new Date(now.getTime() + 72 * 60 * 60 * 1000); 
-        if (dateObj > maxDate) { alert("Error: 72h limit."); throw new Error("Date limit"); }
+        if (dateObj > maxDate) { alert("Error: Resend Free Tier limit is 72 hours."); throw new Error("Date limit"); }
         scheduledAtISO = dateObj.toISOString();
       }
 
@@ -193,7 +231,6 @@ const CampaignForm: React.FC = () => {
       const attachments: any[] = [];
       let imageHtml = "";
       
-      // Process NEW files
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
@@ -208,9 +245,6 @@ const CampaignForm: React.FC = () => {
         }
       }
 
-      // Process EXISTING media (URLs)
-      // Note: For Resend to inline these from URL, we typically need to download them first or just link them.
-      // For simplicity here, we will just LINK them in HTML, as converting URL -> Base64 -> Upload again is inefficient.
       if (existingMedia.length > 0) {
           existingMedia.forEach(url => {
               imageHtml += `<br/><img src="${url}" alt="Campaign Media" style="max-width: 100%; height: auto;" /><br/>`;
@@ -243,7 +277,6 @@ const CampaignForm: React.FC = () => {
     }
   };
 
-  // NEW Helper: Upload files to Storage
   const uploadFilesToStorage = async (): Promise<string[]> => {
       if (files.length === 0) return [];
       const uploadedUrls: string[] = [];
@@ -254,7 +287,7 @@ const CampaignForm: React.FC = () => {
           const filePath = `${user?.id}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
-              .from('campaign-media') // MAKE SURE THIS BUCKET EXISTS
+              .from('campaign-media')
               .upload(filePath, file);
 
           if (uploadError) {
@@ -270,12 +303,19 @@ const CampaignForm: React.FC = () => {
 
   const saveCampaignHistory = async (status: string) => {
       if(!user) return;
-
-      // 1. Upload new files first
       const newUploadedUrls = await uploadFilesToStorage();
-      
-      // 2. Combine with existing
       const finalMediaList = [...existingMedia, ...newUploadedUrls];
+
+      // FIX: Safe date conversion to avoid "toISOString is not a function"
+      let scheduledDateISO = null;
+      if (scheduledDate) {
+          // If it's already a Date object, this works.
+          // If it's a string (from loading previously saved data), new Date() parses it.
+          const dateObj = new Date(scheduledDate);
+          if (!isNaN(dateObj.getTime())) {
+             scheduledDateISO = dateObj.toISOString();
+          }
+      }
 
       const campaignData = {
           user_id: user.id,
@@ -283,11 +323,11 @@ const CampaignForm: React.FC = () => {
           content: content,
           platforms: selectedPlatforms,
           status: status,
-          scheduled_date: scheduledDate,
+          scheduled_date: scheduledDateISO,
           platform_data: { 
               ...platformData, 
               target_group_id: selectedGroupId,
-              media: finalMediaList // Save the URLs!
+              media: finalMediaList 
           } 
       };
 
@@ -329,7 +369,6 @@ const CampaignForm: React.FC = () => {
     setIsSubmitting(false);
   };
 
-  // ... (Keep boilerplate: handlePlatformDataChange, isStepCompleted, handleStepClick, renderFlow, nextStep, prevStep)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePlatformDataChange = (platform: string, data: Record<string, any>) => {
     setPlatformData((prev) => ({ ...prev, [platform]: data }));
@@ -372,7 +411,6 @@ const CampaignForm: React.FC = () => {
         />
       </Modal>
 
-      {/* WhatsApp Queue Modal */}
       <Modal opened={isSendingSessionActive} onClose={() => setIsSendingSessionActive(false)} title="Sending WhatsApp" closeOnClickOutside={false}>
         <Box ta="center">
           <Text mb="md">Sending to <b>{sendingQueue.length}</b> recipients. <br/>Progress: {currentSendingIndex} / {sendingQueue.length}</Text>
@@ -403,6 +441,20 @@ const CampaignForm: React.FC = () => {
         <Box mt="xl">
           {activeStep === 0 && (
              <Box>
+               {/* AI Generator Button */}
+               <Group justify="flex-end" mb="xs">
+                 <Button 
+                    variant="gradient" 
+                    gradient={{ from: 'indigo', to: 'cyan' }} 
+                    leftSection={<SparklesIcon size={16} />}
+                    onClick={handleGenerateContent}
+                    loading={isGeneratingAI}
+                    disabled={files.length === 0 && existingMedia.length === 0}
+                 >
+                    Auto-fill with AI
+                 </Button>
+               </Group>
+
                <TextInput label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required mb="md" />
                <Textarea label="Content" value={content} onChange={(e) => setContent(e.currentTarget.value)} minRows={4} required mb="md" />
                
@@ -419,10 +471,9 @@ const CampaignForm: React.FC = () => {
                  <Button onClick={() => setIsModalOpen(true)}>Project</Button>
                </Group>
                
-               {/* MEDIA PREVIEW GRID (NEW + EXISTING) */}
+               {/* MEDIA PREVIEW GRID */}
                {(files.length > 0 || existingMedia.length > 0) && (
                  <SimpleGrid cols={{ base: 3, sm: 4 }} mt="md">
-                   {/* 1. Existing Media (From DB) */}
                    {existingMedia.map((url, index) => (
                      <Box key={`exist-${index}`} pos="relative">
                        <Image 
@@ -443,11 +494,10 @@ const CampaignForm: React.FC = () => {
                        >
                          <XIcon size={12} />
                        </ActionIcon>
-                       <Text size="xs" c="dimmed" mt={4} ta="center">Saved Image</Text>
+                       <Text size="xs" c="dimmed" mt={4} ta="center">Saved</Text>
                      </Box>
                    ))}
 
-                   {/* 2. New Files (From Input) */}
                    {files.map((file, index) => (
                      <Box key={`new-${index}`} pos="relative">
                        <Image 
@@ -473,7 +523,6 @@ const CampaignForm: React.FC = () => {
                    ))}
                  </SimpleGrid>
                )}
-               {/* End Preview */}
 
              </Box>
           )}
