@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import '@mantine/core/styles.css';
 import { AuthProvider } from './auth/AuthProvider';
-import { MantineProvider, ColorSchemeScript } from '@mantine/core';
+import { MantineProvider } from '@mantine/core';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);

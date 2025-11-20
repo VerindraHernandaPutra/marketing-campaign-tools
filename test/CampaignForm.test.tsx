@@ -36,6 +36,18 @@ vi.mock('../src/components/CampaignManager/flows/SocialMediaFlow', () => ({
   default: () => <div>Social Media Flow</div>,
 }));
 
+vi.mock('../src/supabaseClient', () => ({
+  supabase: {
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+  },
+}));
+
+vi.mock('../src/auth/useAuth', () => ({
+  useAuth: () => ({ user: { id: '123' } }),
+}));
+
 
 describe('CampaignForm', () => {
   it('renders the form title', () => {
