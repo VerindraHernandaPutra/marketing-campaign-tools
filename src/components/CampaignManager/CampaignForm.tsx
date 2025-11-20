@@ -45,6 +45,39 @@ const CampaignForm: React.FC = () => {
     }));
   };
 
+  const isStepCompleted = (step: number) => {
+    if (step === 0) {
+      return title.trim() !== '' && content.trim() !== '';
+    }
+    if (step === 1) {
+      return selectedPlatforms.length > 0;
+    }
+    if (step === 2) {
+      return selectedPlatforms.every((platform) => {
+        if (platform === 'email') {
+          const emailData = platformData.email;
+          return emailData && emailData.subject && emailData.fromAddress;
+        }
+        return true;
+      });
+    }
+    return true;
+  };
+
+  const handleStepClick = (step: number) => {
+    if (step < activeStep) {
+      setActiveStep(step);
+      return;
+    }
+
+    for (let i = 0; i < step; i++) {
+      if (!isStepCompleted(i)) {
+        return;
+      }
+    }
+    setActiveStep(step);
+  };
+
   const renderFlow = () => {
     const flows = [];
     if (selectedPlatforms.includes('whatsapp')) {
@@ -84,7 +117,7 @@ const CampaignForm: React.FC = () => {
 
   return (
     <Paper shadow="sm" p="xl" mb="xl">
-      <Stepper active={activeStep} onStepClick={setActiveStep}>
+      <Stepper active={activeStep} onStepClick={handleStepClick}>
         <Stepper.Step label="Campaign Details" description="Title and content" />
         <Stepper.Step label="Select Platforms" description="Choose where to post" />
         <Stepper.Step label="Configure" description="Platform-specific settings" />
@@ -151,7 +184,7 @@ const CampaignForm: React.FC = () => {
             Back
           </Button>
         )}
-        {activeStep < 3 && <Button onClick={nextStep}>Next step</Button>}
+        {activeStep < 3 && <Button onClick={nextStep} disabled={!isStepCompleted(activeStep)}>Next step</Button>}
         {activeStep === 3 && (
           <Button onClick={handleSubmit} color="blue">
             {scheduledDate ? 'Schedule Campaign' : 'Post Now'}
