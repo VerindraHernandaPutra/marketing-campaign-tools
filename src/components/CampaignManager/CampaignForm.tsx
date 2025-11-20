@@ -15,6 +15,7 @@ const CampaignForm: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [platformData, setPlatformData] = useState<Record<string, Record<string, any>>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -40,6 +41,7 @@ const CampaignForm: React.FC = () => {
   const nextStep = () => setActiveStep((current) => (current < 3 ? current + 1 : current));
   const prevStep = () => setActiveStep((current) => (current > 0 ? current - 1 : current));
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePlatformDataChange = (platform: string, data: Record<string, any>) => {
     setPlatformData((prev) => ({
       ...prev,
@@ -104,8 +106,6 @@ const CampaignForm: React.FC = () => {
       flows.push(
         <SocialMediaFlow
           key="social"
-          data={platformData.social || {}}
-          onChange={(data) => handlePlatformDataChange('social', data)}
         />
       );
     }

@@ -1,6 +1,5 @@
-// 1. FIX: Removed 'useMantineTheme' and added 'useRef'
 import React, { useState, useEffect, useRef } from 'react';
-import { AppShell } from '@mantine/core'; // 'useMantineTheme' removed
+import { AppShell } from '@mantine/core'; 
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
 import CanvasComponent from './LayoutNext/Canvas';
@@ -8,7 +7,6 @@ import PropertiesPanel from './Layout/PropertiesPanel';
 import ResizeModal from './Layout/ResizeModal';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-// 2. FIX: Import 'Point' from fabric
 import { Canvas, Object as FabricObject, Point } from 'fabric';
 
 import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
@@ -20,7 +18,6 @@ type LoadedCanvasData = {
 };
 
 const CanvaEditor: React.FC = () => {
-  // ... (state variables remain the same) ...
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
 
@@ -35,7 +32,6 @@ const CanvaEditor: React.FC = () => {
   
   const [projectData, setProjectData] = useState<string | null>(null);
 
-  // 3. FIX: Add ref for the main canvas area
   const mainAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,21 +63,37 @@ const CanvaEditor: React.FC = () => {
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
     
+    // 1. Reset Viewport for accurate saving so the thumbnail isn't zoomed/panned
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     canvas.width = dimensions.width;
     canvas.height = dimensions.height;
     
     const canvasJson = canvas.toJSON(); 
-    console.log('Saving project...', canvasJson);
     
+    // 2. Generate Thumbnail (Data URI)
+    // We use a multiplier of 0.2 to create a small preview image (20% size) to save bandwidth
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 0.8,
+      multiplier: 0.2 
+    });
+
+    console.log('Saving project...', { hasThumbnail: !!dataURL });
+    
+    // 3. Save both JSON and Thumbnail to Supabase
     const { error } = await supabase
       .from('projects')
-      .update({ canvas_data: canvasJson }) 
+      .update({ 
+        canvas_data: canvasJson,
+        thumbnail_url: dataURL,
+        updated_at: new Date().toISOString()
+      }) 
       .eq('id', projectId);
 
     if (error) {
       alert('Error saving project: ' + error.message);
     } else {
-      alert('Project Saved!');
+      alert('Project Saved! Thumbnail updated.');
     }
   };
 
@@ -105,7 +117,6 @@ const CanvaEditor: React.FC = () => {
     setIsResizeModalOpen(false);
   };
 
-  // 4. FIX: Use 'new Point()' for zoom center
   const handleZoomIn = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
@@ -121,7 +132,6 @@ const CanvaEditor: React.FC = () => {
     canvas.renderAll();
   };
 
-  // 5. FIX: Use 'new Point()' for zoom center
   const handleZoomOut = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
@@ -137,7 +147,6 @@ const CanvaEditor: React.FC = () => {
     canvas.renderAll();
   };
 
-  // 6. FIX: Renamed to handleFitToCanvas and updated logic
   const handleFitToCanvas = () => {
     if (!canvas || !mainAreaRef.current) return;
 
@@ -162,7 +171,6 @@ const CanvaEditor: React.FC = () => {
     canvas.renderAll();
   };
 
-
   const contextValue: CanvasContextType = {
     canvas,
     selectedObject
@@ -174,8 +182,6 @@ const CanvaEditor: React.FC = () => {
         styles={{
           main: {
             padding: 0,
-            // 7. FIX: Explicitly set the main area's height to
-            // fill the viewport (100vh) minus the header (60px).
             height: 'calc(100vh - 60px)',
           }
         }} 
@@ -203,10 +209,9 @@ const CanvaEditor: React.FC = () => {
             propertiesPanelOpened={propertiesPanelOpened} 
             onTogglePropertiesPanel={() => setPropertiesPanelOpened(!propertiesPanelOpened)} 
             onToggleResizeModal={() => setIsResizeModalOpen(true)}
-            // 8. FIX: Pass zoom functions to Header
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
-            onFitToCanvas={handleFitToCanvas} // 9. FIX: Renamed prop
+            onFitToCanvas={handleFitToCanvas}
           />
         </AppShell.Header>
         
@@ -223,7 +228,6 @@ const CanvaEditor: React.FC = () => {
           )}
         </AppShell.Aside>
         
-        {/* 10. FIX: Add ref to AppShell.Main */}
         <AppShell.Main ref={mainAreaRef}>
           <CanvasComponent 
             setCanvas={setCanvas}
