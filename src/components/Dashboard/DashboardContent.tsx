@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader } from '@mantine/core';
-import { LayoutIcon, ImageIcon, FileTextIcon } from 'lucide-react';
+import { LayoutIcon, FacebookIcon, InstagramIcon, MailIcon } from 'lucide-react'; // Removed unused icons
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
 import { supabase } from '../../supabaseClient';
@@ -74,21 +74,50 @@ const DashboardContent: React.FC = () => {
             Start creating
           </Title>
           <Text c="dimmed" size="sm" mb="lg">
-            Choose a template or start from scratch
+            Choose a format for your marketing campaign
           </Text>
+          {/* Updated Grid: Relevant Marketing Sizes Only */}
           <SimpleGrid 
-            cols={{ base: 2, sm: 3, md: 5 }} 
+            cols={{ base: 1, sm: 2, md: 4 }} 
             spacing="md"
           >
-            <CreateNewCard icon={<LayoutIcon size={32} />} title="Custom Size" description="Create any design" />
-            <CreateNewCard icon={<ImageIcon size={32} />} title="Instagram Post" description="1080 x 1080 px" />
-            <CreateNewCard icon={<FileTextIcon size={32} />} title="Presentation" description="1920 x 1080 px" />
-            <CreateNewCard icon={<LayoutIcon size={32} />} title="Flyer" description="A4 Portrait" />
-            <CreateNewCard icon={<ImageIcon size={32} />} title="Logo" description="500 x 500 px" />
+            {/* Custom Size (Default) */}
+            <CreateNewCard 
+                icon={<LayoutIcon size={24} />} 
+                title="Custom Size" 
+                description="Start from scratch" 
+            />
+
+            {/* Instagram Post (1080x1080) */}
+            <CreateNewCard 
+                icon={<InstagramIcon size={24} />} 
+                title="Instagram Post" 
+                description="1080 x 1080 px" 
+                width={1080} 
+                height={1080} 
+            />
+
+            {/* Facebook Post (1200x630) */}
+            <CreateNewCard 
+                icon={<FacebookIcon size={24} />} 
+                title="Facebook Post" 
+                description="1200 x 630 px" 
+                width={1200} 
+                height={630} 
+            />
+
+            {/* Email Header (600x200) */}
+            <CreateNewCard 
+                icon={<MailIcon size={24} />} 
+                title="Email Header" 
+                description="600 x 200 px" 
+                width={600} 
+                height={200} 
+            />
           </SimpleGrid>
         </Box>
         
-        <Tabs value={activeTab} onChange={setActiveTab} className="mt-8">
+        <Tabs value={activeTab} onChange={setActiveTab} className="mt-8" color="blue">
           <Tabs.List>
             <Tabs.Tab value="recent">Recent designs</Tabs.Tab>
             <Tabs.Tab value="templates">Templates</Tabs.Tab>
@@ -97,14 +126,14 @@ const DashboardContent: React.FC = () => {
           <Tabs.Panel value="recent" pt="xl">
             <Group justify="space-between" mb="md">
               <Title order={3}>Your designs</Title>
-              <Button variant="subtle" size="sm" onClick={fetchRecentProjects}>
+              <Button variant="subtle" size="sm" onClick={fetchRecentProjects} color="blue">
                 Refresh
               </Button>
             </Group>
             
             {loading ? (
               <Center mt="xl" style={{ height: 100 }}>
-                <Loader />
+                <Loader color="blue" />
               </Center>
             ) : (
               <SimpleGrid 
