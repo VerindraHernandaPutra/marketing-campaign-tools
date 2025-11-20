@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text, Checkbox, SimpleGrid, Paper, Group } from '@mantine/core';
-import { MessageCircleIcon, MailIcon, FacebookIcon, InstagramIcon, TwitterIcon, LinkedinIcon } from 'lucide-react';
+import { MessageCircleIcon, MailIcon, FacebookIcon, InstagramIcon } from 'lucide-react';
 
 interface PlatformSelectorProps {
   selectedPlatforms: string[];
@@ -27,16 +27,6 @@ const platforms = [{
   name: 'Instagram',
   icon: InstagramIcon,
   color: '#E4405F'
-}, {
-  id: 'twitter',
-  name: 'Twitter',
-  icon: TwitterIcon,
-  color: '#1DA1F2'
-}, {
-  id: 'linkedin',
-  name: 'LinkedIn',
-  icon: LinkedinIcon,
-  color: '#0A66C2'
 }];
 
 const PlatformSelector: React.FC<PlatformSelectorProps> = ({

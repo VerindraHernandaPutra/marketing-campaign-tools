@@ -3,6 +3,7 @@ import './index.css';
 import { createRoot } from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 import { AuthProvider } from './auth/AuthProvider';
 import { MantineProvider } from '@mantine/core';
 
