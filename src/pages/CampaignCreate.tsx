@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { MantineProvider, Flex, Container, Title, Box, Group, Button, Text } from '@mantine/core';
+import { MantineProvider, Flex, Container, Title, Box, Button, Group } from '@mantine/core';
 import { useColorScheme } from '@mantine/hooks';
-import { useNavigate } from 'react-router-dom';
-import { PlusIcon } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom'; // Added useParams
+import { ArrowLeft } from 'lucide-react';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
-import CampaignHistory from '../components/CampaignManager/CampaignHistory'; 
+import CampaignForm from '../components/CampaignManager/CampaignForm';
 import '@mantine/core/styles.css';
 
-const CampaignManager: React.FC = () => {
+const CampaignCreate: React.FC = () => {
   const preferredColorScheme = useColorScheme();
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
   const navigate = useNavigate();
+  const { campaignId } = useParams(); // Get ID if editing
 
   return (
     <MantineProvider theme={{}} forceColorScheme={colorScheme}>
@@ -22,21 +23,17 @@ const CampaignManager: React.FC = () => {
           <DashboardSidebar />
           <Box className="flex-1 p-8">
             <Container size="xl">
-              <Group justify="space-between" mb="xl">
-                <div>
-                  <Title order={2}>Campaigns</Title>
-                  <Text c="dimmed" size="sm">Manage and track your marketing efforts</Text>
-                </div>
-                <Button 
-                  leftSection={<PlusIcon size={16} />} 
-                  onClick={() => navigate('/campaign-manager/new')}
-                >
-                  Create Campaign
+              <Group mb="lg">
+                <Button variant="subtle" size="sm" leftSection={<ArrowLeft size={16} />} onClick={() => navigate('/campaign-manager')}>
+                  Back to Campaigns
                 </Button>
               </Group>
+              <Title order={2} mb="xl">
+                {campaignId ? 'Edit Campaign' : 'Create New Campaign'}
+              </Title>
               
-              {/* Only History Table is shown here now */}
-              <CampaignHistory /> 
+              {/* Input Form */}
+              <CampaignForm />
             </Container>
           </Box>
         </Flex>
@@ -45,4 +42,4 @@ const CampaignManager: React.FC = () => {
   );
 };
 
-export default CampaignManager;
+export default CampaignCreate;
