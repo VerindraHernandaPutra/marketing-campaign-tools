@@ -10,6 +10,7 @@ import Folders from './pages/Folders';
 import Templates from './pages/Templates';
 import Clients from './pages/Clients';
 import Groups from './pages/Groups';
+import Profile from './pages/Profile';
 import { LoginPage } from './pages/LoginPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 
@@ -22,10 +23,9 @@ export function AppRouter() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/editor/:projectId" element={<App />} />
           
-          {/* Campaign Routes */}
           <Route path="/campaign-manager" element={<CampaignManager />} />
           <Route path="/campaign-manager/new" element={<CampaignCreate />} />
-          <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} /> {/* Reusing Create Page for Edit */}
+          <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
           
           <Route path="/scheduled" element={<ScheduledPosts />} />
           <Route path="/analytics" element={<Analytics />} />
@@ -34,6 +34,9 @@ export function AppRouter() {
           <Route path="/templates" element={<Templates />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/groups" element={<Groups />} />
+          
+          {/* FIX: Ensure this route is here */}
+          <Route path="/profile" element={<Profile />} /> 
         </Route>
       </Routes>
     </BrowserRouter>
