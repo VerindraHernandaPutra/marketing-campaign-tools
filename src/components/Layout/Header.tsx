@@ -15,6 +15,8 @@ interface HeaderProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitToCanvas: () => void;
+  // NEW PROP
+  onToggleDownloadModal: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -24,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   onUpdateTitle,
   onSave,
   onToggleResizeModal,
-  // Zoom props are kept in interface but removed from UI as 'View' menu is gone
+  onToggleDownloadModal
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
@@ -53,7 +55,7 @@ const Header: React.FC<HeaderProps> = ({
     <Box p="xs" h={60}>
       <Group justify="space-between" style={{ height: '100%' }}>
         <Group>
-          <ActionIcon onClick={() => navigate('/')} size="lg">
+          <ActionIcon onClick={() => navigate('/campaign-manager')} size="lg">
             <ArrowLeft size={20} />
           </ActionIcon>
           <ActionIcon onClick={onToggleSidebar} size="lg">
@@ -90,7 +92,8 @@ const Header: React.FC<HeaderProps> = ({
                 <Menu.Item leftSection={<ExpandIcon size={14} />} onClick={onToggleResizeModal}>
                   Resize
                 </Menu.Item>
-                <Menu.Item leftSection={<DownloadIcon size={14} />}>
+                {/* FIX: Wire up the download modal */}
+                <Menu.Item leftSection={<DownloadIcon size={14} />} onClick={onToggleDownloadModal}>
                   Download
                 </Menu.Item>
               </Menu.Dropdown>

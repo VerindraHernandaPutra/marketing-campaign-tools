@@ -5,9 +5,11 @@ import Sidebar from './Layout/Sidebar';
 import CanvasComponent from './LayoutNext/Canvas';
 import PropertiesPanel from './Layout/PropertiesPanel';
 import ResizeModal from './Layout/ResizeModal';
+import DownloadModal from './Layout/DownloadModal'; // Import new modal
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Canvas, Object as FabricObject, Point } from 'fabric';
+import { jsPDF } from 'jspdf'; // Make sure to install this: npm install jspdf
 
 import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
 
@@ -27,6 +29,7 @@ const CanvaEditor: React.FC = () => {
 
   const [dimensions, setDimensions] = useState({ width: 850, height: 500 });
   const [isResizeModalOpen, setIsResizeModalOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false); // New State
 
   const { projectId } = useParams<{ projectId: string }>();
   
@@ -50,7 +53,6 @@ const CanvaEditor: React.FC = () => {
         if (data.canvas_data) {
           const loadedData = data.canvas_data as LoadedCanvasData;
           
-          // FIX: Restore dimensions if they exist in the saved data
           if (loadedData.width && loadedData.height) {
             setDimensions({ width: loadedData.width, height: loadedData.height });
           }
@@ -65,19 +67,14 @@ const CanvaEditor: React.FC = () => {
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
     
-    // 1. Reset Viewport
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     
-    // 2. Generate Thumbnail
     const dataURL = canvas.toDataURL({
       format: 'png',
       quality: 0.8,
       multiplier: 0.2 
     });
 
-    // 3. Prepare JSON
-    // FIX: Explicitly merge width, height, and background into the JSON
-    // Fabric's default toJSON() might not include the canvas dimensions themselves
     const baseJson = canvas.toJSON();
     const canvasJson = {
         ...baseJson,
@@ -88,7 +85,6 @@ const CanvaEditor: React.FC = () => {
 
     console.log('Saving project...', canvasJson);
     
-    // 4. Save to Supabase
     const { error } = await supabase
       .from('projects')
       .update({ 
@@ -103,6 +99,44 @@ const CanvaEditor: React.FC = () => {
     } else {
       alert('Project Saved!');
     }
+  };
+
+  // New: Advanced Download Handler
+  const handleDownload = (format: 'png' | 'jpeg' | 'pdf', quality: number, multiplier: number) => {
+      if (!canvas) return;
+
+      // Reset zoom for clean export
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+
+      if (format === 'pdf') {
+          // PDF Logic
+          const imgData = canvas.toDataURL({
+              format: 'png',
+              multiplier: multiplier,
+          });
+          
+          // Calculate orientation
+          const orientation = dimensions.width > dimensions.height ? 'l' : 'p';
+          const pdf = new jsPDF(orientation, 'px', [dimensions.width, dimensions.height]);
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, dimensions.width, dimensions.height);
+          pdf.save(`${projectTitle}.pdf`);
+
+      } else {
+          // Image Logic
+          const dataURL = canvas.toDataURL({
+              format: format,
+              quality: quality,
+              multiplier: multiplier,
+          });
+
+          const link = document.createElement('a');
+          link.href = dataURL;
+          link.download = `${projectTitle}.${format}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      }
   };
 
   const handleUpdateTitle = async (newTitle: string) => {
@@ -218,6 +252,8 @@ const CanvaEditor: React.FC = () => {
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onFitToCanvas={handleFitToCanvas}
+            // Add prop to trigger download modal
+            onToggleDownloadModal={() => setIsDownloadModalOpen(true)}
           />
         </AppShell.Header>
         
@@ -250,6 +286,12 @@ const CanvaEditor: React.FC = () => {
         onClose={() => setIsResizeModalOpen(false)}
         onResize={handleResize}
         currentDimensions={dimensions}
+      />
+
+      <DownloadModal
+        opened={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        onDownload={handleDownload}
       />
     </CanvasContext.Provider>
   );
