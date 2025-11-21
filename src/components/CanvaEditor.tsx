@@ -49,11 +49,13 @@ const CanvaEditor: React.FC = () => {
         setProjectTitle(data.title);
         if (data.canvas_data) {
           const loadedData = data.canvas_data as LoadedCanvasData;
-          setProjectData(JSON.stringify(loadedData)); 
           
+          // FIX: Restore dimensions if they exist in the saved data
           if (loadedData.width && loadedData.height) {
             setDimensions({ width: loadedData.width, height: loadedData.height });
           }
+          
+          setProjectData(JSON.stringify(loadedData)); 
         }
       }
     };
@@ -63,24 +65,30 @@ const CanvaEditor: React.FC = () => {
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
     
-    // 1. Reset Viewport for accurate saving so the thumbnail isn't zoomed/panned
+    // 1. Reset Viewport
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
     
-    const canvasJson = canvas.toJSON(); 
-    
-    // 2. Generate Thumbnail (Data URI)
-    // We use a multiplier of 0.2 to create a small preview image (20% size) to save bandwidth
+    // 2. Generate Thumbnail
     const dataURL = canvas.toDataURL({
       format: 'png',
       quality: 0.8,
       multiplier: 0.2 
     });
 
-    console.log('Saving project...', { hasThumbnail: !!dataURL });
+    // 3. Prepare JSON
+    // FIX: Explicitly merge width, height, and background into the JSON
+    // Fabric's default toJSON() might not include the canvas dimensions themselves
+    const baseJson = canvas.toJSON();
+    const canvasJson = {
+        ...baseJson,
+        width: dimensions.width,
+        height: dimensions.height,
+        backgroundColor: '#ffffff'
+    };
+
+    console.log('Saving project...', canvasJson);
     
-    // 3. Save both JSON and Thumbnail to Supabase
+    // 4. Save to Supabase
     const { error } = await supabase
       .from('projects')
       .update({ 
@@ -93,7 +101,7 @@ const CanvaEditor: React.FC = () => {
     if (error) {
       alert('Error saving project: ' + error.message);
     } else {
-      alert('Project Saved! Thumbnail updated.');
+      alert('Project Saved!');
     }
   };
 
@@ -121,7 +129,7 @@ const CanvaEditor: React.FC = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
     let newZoom = currentZoom * 1.2;
-    if (newZoom > 20) newZoom = 20; // Max zoom 20x
+    if (newZoom > 20) newZoom = 20; 
     
     const center = new Point(
       mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
@@ -136,7 +144,7 @@ const CanvaEditor: React.FC = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
     let newZoom = currentZoom / 1.2;
-    if (newZoom < 0.1) newZoom = 0.1; // Min zoom 0.1x
+    if (newZoom < 0.1) newZoom = 0.1; 
     
     const center = new Point(
       mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
@@ -155,21 +163,19 @@ const CanvaEditor: React.FC = () => {
     const designWidth = dimensions.width;
     const designHeight = dimensions.height;
     
-    const newZoom = 1.0; // Reset zoom to 100%
+    const newZoom = 1.0; 
 
-    // Reset viewport transform (identity matrix)
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
-    // Calculate new pan to center the 100% canvas
     const panX = (containerWidth - designWidth * newZoom) / 2;
     const panY = (containerHeight - designHeight * newZoom) / 2;
 
     canvas.setZoom(newZoom);
-    // Apply new zoom and pan
     canvas.setViewportTransform([newZoom, 0, 0, newZoom, panX, panY]);
     
     canvas.renderAll();
   };
+
 
   const contextValue: CanvasContextType = {
     canvas,

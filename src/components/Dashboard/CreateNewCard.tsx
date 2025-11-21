@@ -8,33 +8,34 @@ interface CreateNewCardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  width?: number;  // Added optional width
-  height?: number; // Added optional height
+  width?: number;
+  height?: number;
 }
 
 const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description, width, height }) => {
   const navigate = useNavigate();
-  const { user } = useAuth(); // Get the current user
+  const { user } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreateNew = async () => {
     if (!user) return;
     setIsCreating(true);
 
-    // Construct the payload
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = { 
         title: title, 
         user_id: user.id 
     };
 
-    // If dimensions are provided, initialize canvas_data with those specific dimensions
+    // If dimensions are provided, initialize canvas_data
     if (width && height) {
         payload.canvas_data = { 
+            version: "5.3.0", // Add version just in case
             width, 
             height, 
-            objects: [], // Empty canvas
-            background: 'white'
+            objects: [], 
+            // FIX: Use 'backgroundColor' (correct Fabric prop) and ensure it is hex
+            backgroundColor: '#ffffff' 
         };
     }
 
@@ -60,15 +61,14 @@ const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description,
         className="border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 transition-all cursor-pointer bg-white dark:bg-gray-800 group" 
         radius="md"
         style={(theme: MantineTheme) => ({
-          height: 90, // Minimized height
+          height: 90,
           display: 'flex',
-          flexDirection: 'row', // Horizontal layout to save vertical space
+          flexDirection: 'row',
           alignItems: 'center',
           gap: theme.spacing.md,
           backgroundColor: `light-dark(${theme.white}, ${theme.colors.dark[7]})`,
         })}
       >
-        {/* Minimized Circle Icon Container */}
         <ThemeIcon 
             size={48} 
             radius="xl" 

@@ -21,13 +21,18 @@ const Canvas: React.FC<CanvasProps> = ({
   const [localCanvas, setLocalCanvas] = useState<FabricCanvas | null>(null);
   const theme = useMantineTheme();
 
+  // Initialize Canvas
   useEffect(() => {
     if (!canvasRef.current) return;
+
+    if (localCanvas) {
+      localCanvas.dispose();
+    }
 
     const canvas = new FabricCanvas(canvasRef.current, {
       width: width,
       height: height,
-      backgroundColor: 'white',
+      backgroundColor: '#ffffff',
       devicePixelRatio: window.devicePixelRatio,
       preserveObjectStacking: true,
     });
@@ -60,7 +65,51 @@ const Canvas: React.FC<CanvasProps> = ({
       setLocalCanvas(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); 
+
+  // Load Data Logic
+  useEffect(() => {
+    if (localCanvas && projectData) {
+      try {
+        const json = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+
+        // Ensure background is white immediately
+        localCanvas.backgroundColor = '#ffffff';
+
+        localCanvas.loadFromJSON(json, () => {
+          // Ensure dimensions and background persist after load
+          localCanvas.setDimensions({ width, height });
+          
+          if (!localCanvas.backgroundColor || localCanvas.backgroundColor === 'transparent') {
+             localCanvas.backgroundColor = '#ffffff';
+          }
+          
+          localCanvas.calcOffset(); 
+          localCanvas.renderAll();
+
+          // Safety render
+          setTimeout(() => {
+             if (localCanvas && !localCanvas.isDisposed) { 
+                 localCanvas.requestRenderAll();
+             }
+          }, 100);
+        });
+      } catch (error) {
+        console.error("Error loading canvas JSON:", error);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localCanvas, projectData]); 
+
+  // FIX: Proper Resize Logic
+  useEffect(() => {
+    if (localCanvas) {
+      // Use Fabric's method to resize, NOT manual DOM manipulation
+      localCanvas.setDimensions({ width, height });
+      localCanvas.calcOffset();
+      localCanvas.requestRenderAll();
+    }
+  }, [localCanvas, width, height]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -75,7 +124,6 @@ const Canvas: React.FC<CanvasProps> = ({
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeObjects = localCanvas.getActiveObjects();
         if (activeObjects.length) {
-            // Prevent deleting if editing text
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const activeObj = activeObjects[0] as any;
             if (activeObj.isEditing) return;
@@ -94,50 +142,17 @@ const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [localCanvas, setSelectedObject]);
 
-  // FIX: Improved Data Loading Logic
-  useEffect(() => {
-    if (localCanvas && projectData) {
-      try {
-        // Ensure we parse the string to a JSON object for Fabric
-        const json = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
-        
-        localCanvas.loadFromJSON(json, () => {
-          // 1. Render immediately after parsing
-          localCanvas.requestRenderAll();
-          
-          // 2. Force another render after a short delay 
-          // This fixes the "blank canvas" issue where images/fonts take a few ms to actually be ready for painting
-          setTimeout(() => {
-            localCanvas.requestRenderAll();
-          }, 100);
-        });
-      } catch (error) {
-        console.error("Error loading canvas JSON:", error);
-      }
-    }
-  }, [localCanvas, projectData]);
-
-  // Resize Logic
-  useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.width = width;
-      canvasRef.current.height = height;
-    }
-    if (localCanvas) {
-      localCanvas.setWidth(width);
-      localCanvas.setHeight(height);
-      localCanvas.calcOffset(); // Important for centering
-      localCanvas.requestRenderAll();
-    }
-  }, [localCanvas, width, height]);
-
   return (
     <Box
       style={{
         height: '100%',
-        display: 'grid',
-        placeItems: 'center',
+        width: '100%',
+        display: 'flex', 
+        justifyContent: 'center',
+        alignItems: 'center',
         background: `light-dark(${theme.colors.gray[1]}, ${theme.colors.dark[9]})`,
+        overflow: 'auto', 
+        padding: '40px' 
       }}
     >
       <canvas ref={canvasRef} />
