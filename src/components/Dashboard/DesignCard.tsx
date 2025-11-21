@@ -1,7 +1,7 @@
 import React from 'react';
 import { Paper, Text, Group, ActionIcon, Menu, Image, Box, UnstyledButton, Badge, LoadingOverlay } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { MoreVerticalIcon, TrashIcon, CopyIcon, DownloadIcon } from 'lucide-react';
+import { MoreVerticalIcon, TrashIcon, CopyIcon, DownloadIcon, PlusCircleIcon } from 'lucide-react'; // Added PlusCircleIcon
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
 
@@ -12,7 +12,7 @@ interface DesignCardProps {
     thumbnail: string;
     updated_at?: string | null;
     category?: string;
-    canvas_data?: unknown; // Fix: Use unknown instead of any
+    canvas_data?: unknown; 
   };
   isTemplate?: boolean;
   onRefresh?: () => void;
@@ -122,6 +122,18 @@ const DesignCard: React.FC<DesignCardProps> = ({
     }
   };
 
+  // NEW: Function to add design to campaign
+  const handleAddToCampaign = () => {
+    navigate('/campaign-manager/new', { 
+      state: { 
+        importedDesign: {
+          title: design.title,
+          thumbnail: design.thumbnail
+        } 
+      } 
+    });
+  };
+
   return <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" withBorder pos="relative">
       <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
       <UnstyledButton onClick={handleClick} className="w-full">
@@ -165,6 +177,13 @@ const DesignCard: React.FC<DesignCardProps> = ({
                 </ActionIcon>
                 </Menu.Target>
                 <Menu.Dropdown>
+                {/* NEW: Add to Campaign Item */}
+                <Menu.Item leftSection={<PlusCircleIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleAddToCampaign(); }}>
+                    Add to Campaign
+                </Menu.Item>
+                
+                <Menu.Divider />
+
                 <Menu.Item leftSection={<CopyIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}>
                     Duplicate
                 </Menu.Item>

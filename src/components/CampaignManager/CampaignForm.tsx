@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css'; 
-import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react'; 
+import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom'; // Added useLocation
 import PlatformSelector from './PlatformSelector';
 import WhatsappFlow from './flows/WhatsappFlow';
 import EmailFlow from './flows/EmailFlow';
@@ -16,6 +16,7 @@ const CampaignForm: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { campaignId } = useParams();
+  const location = useLocation(); // Hook to access state passed from DesignCard
 
   const [activeStep, setActiveStep] = useState(0);
   const [title, setTitle] = useState('');
@@ -38,6 +39,32 @@ const CampaignForm: React.FC = () => {
   const [sendingQueue, setSendingQueue] = useState<string[]>([]);
   const [currentSendingIndex, setCurrentSendingIndex] = useState(0);
   const [isSendingSessionActive, setIsSendingSessionActive] = useState(false);
+
+  // Handle Imported Design from Dashboard
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = location.state as any;
+    if (state?.importedDesign) {
+      const { title: designTitle, thumbnail } = state.importedDesign;
+      
+      // Auto-fill Title if empty
+      if (!title && designTitle) setTitle(designTitle);
+      
+      // Auto-add Thumbnail to media list
+      if (thumbnail) {
+         // Avoid duplicates if effect runs twice
+         setExistingMedia(prev => {
+            if (prev.includes(thumbnail)) return prev;
+            return [...prev, thumbnail];
+         });
+      }
+      
+      // Optional: Clear state to prevent re-adding on refresh (though browser usually handles this)
+      window.history.replaceState({}, document.title);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -160,7 +187,6 @@ const CampaignForm: React.FC = () => {
             body: { 
                 imageBase64: imageToAnalyze,
                 context: audienceContext,
-                // FIX: Pass current input values to backend
                 currentTitle: title,
                 currentContent: content
             }
@@ -335,7 +361,7 @@ const CampaignForm: React.FC = () => {
           content: content,
           platforms: selectedPlatforms,
           status: status,
-          scheduled_date: scheduledDate,
+          scheduled_date: scheduledDate ? scheduledDate.toISOString() : null,
           platform_data: { 
               ...platformData, 
               target_group_id: selectedGroupId,
