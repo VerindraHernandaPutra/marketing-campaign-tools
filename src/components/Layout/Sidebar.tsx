@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-// 1. FIX: Added imports for new components (TextInput, Button, Stack)
-import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, TextInput, Button, Stack } from '@mantine/core';
-// 2. FIX: Added/Removed icons
+import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, TextInput, Button, Stack, Loader, Select, Textarea } from '@mantine/core';
 import { 
   ImageIcon, 
   TypeIcon, 
@@ -12,12 +10,12 @@ import {
   BoxIcon, 
   HexagonIcon, 
   MinusIcon, 
-  BaselineIcon, // Added for Subheading
-  SparklesIcon  // Added for AI
+  BaselineIcon, 
+  SparklesIcon
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
-// 3. FIX: Added 'Image as FabricImage' to the import
 import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline, Image as FabricImage } from 'fabric';
+import { supabase } from '../../supabaseClient';
 
 interface SidebarProps {
   opened: boolean;
@@ -27,11 +25,18 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string | null>('elements');
-  // 4. FIX: Add state for the AI prompt
-  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const { canvas } = useFabricCanvas();
 
-  // ... (addShape and addText functions remain the same) ...
+  // Structured AI Input State
+  const [aiParams, setAiParams] = useState({
+    subject: '',
+    theme: '',
+    background: '',
+    mood: '',
+    purpose: ''
+  });
+
   const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line' | 'ellipse' | 'polygon' | 'polyline') => {
     if (!canvas) return;
     
@@ -123,10 +128,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
     }
   };
 
-
-  // 5. FIX: Refactor handleAddMedia to use async/await
   const handleAddMedia = () => {
-    // Create a hidden file input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -136,25 +138,19 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
       const reader = new FileReader();
       
-      // Make the onload callback async
       reader.onload = async (f) => {
         try {
           const data = f.target?.result as string;
-          
-          // Await the image loading
           const img = await FabricImage.fromURL(data);
 
-          // Scale image to fit canvas if it's too large
           const canvasWidth = canvas.getWidth();
           const canvasHeight = canvas.getHeight();
-          // Calculate scale to fit image within 80% of canvas dimensions
           const scale = Math.min(
             (canvasWidth * 0.8) / (img.width || canvasWidth), 
             (canvasHeight * 0.8) / (img.height || canvasHeight)
           );
 
           img.set({
-            // Center the image
             left: (canvasWidth - (img.width || 0) * scale) / 2,
             top: (canvasHeight - (img.height || 0) * scale) / 2,
             scaleX: scale,
@@ -171,13 +167,50 @@ const Sidebar: React.FC<SidebarProps> = () => {
       };
       reader.readAsDataURL(file);
     };
-    // Trigger the file input click
     input.click();
   };
 
-  // ... (handleGenerateAI and ElementItem component remain the same) ...
-  const handleGenerateAI = () => {
-    alert(`AI Generation for prompt: "${aiPrompt}" is not implemented yet.`);
+  const handleGenerateAI = async () => {
+    // Validation: At least a subject is required
+    if (!aiParams.subject.trim() || !canvas) return;
+    
+    setIsGenerating(true);
+
+    try {
+        const { data, error } = await supabase.functions.invoke('generate-image', {
+            body: { params: aiParams }
+        });
+
+        if (error) throw error;
+        
+        if (data && data.image) {
+            const img = await FabricImage.fromURL(data.image);
+            
+            const canvasWidth = canvas.getWidth();
+            const canvasHeight = canvas.getHeight();
+            const scale = Math.min(
+                (canvasWidth * 0.5) / (img.width || canvasWidth), 
+                (canvasHeight * 0.5) / (img.height || canvasHeight)
+            );
+
+            img.set({
+                left: (canvasWidth - (img.width || 0) * scale) / 2,
+                top: (canvasHeight - (img.height || 0) * scale) / 2,
+                scaleX: scale,
+                scaleY: scale,
+            });
+
+            canvas.add(img);
+            canvas.setActiveObject(img);
+            canvas.renderAll();
+        }
+    } catch (error: unknown) {
+        console.error("AI Generation Failed:", error);
+        const message = error instanceof Error ? error.message : "Unknown error occurred";
+        alert("Failed to generate image: " + message);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const ElementItem = ({
@@ -208,12 +241,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
     </UnstyledButton>
   );
 
-  
   return (
     <Box p="md" w={300}>
-      {/* ... (Tabs UI remains the same) ... */}
       <Box mt="xs">
-        {/* ... (Tabs) ... */}
         <Group justify="center" mb="md">
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
@@ -247,9 +277,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         <Divider mb="md" />
       </Box>
 
-      {/* ... (ScrollArea and Accordion UI remains the same) ... */}
       <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs">
-        {activeTab === 'elements' ? <Accordion multiple defaultValue={['shapes']}>
+        {activeTab === 'elements' ? <Accordion multiple defaultValue={['ai']}>
             <Accordion.Item value="shapes">
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
@@ -265,7 +294,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
               </Accordion.Panel>
             </Accordion.Item>
             
-            {/* 8. FIX: Updated Text section */}
             <Accordion.Item value="text">
               <Accordion.Control>Text</Accordion.Control>
               <Accordion.Panel>
@@ -277,7 +305,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
               </Accordion.Panel>
             </Accordion.Item>
 
-            {/* 9. FIX: Updated Media section (removed Grid) */}
             <Accordion.Item value="media">
               <Accordion.Control>Media</Accordion.Control>
               <Accordion.Panel>
@@ -287,45 +314,88 @@ const Sidebar: React.FC<SidebarProps> = () => {
               </Accordion.Panel>
             </Accordion.Item>
 
-            {/* 10. FIX: Added AI Generator section */}
             <Accordion.Item value="ai">
               <Accordion.Control icon={<SparklesIcon size={18} />}>
-                AI Generator
+                AI Generator (Beta)
               </Accordion.Control>
               <Accordion.Panel>
-                <Stack>
-                  <TextInput 
-                    placeholder="Describe an image to generate..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.currentTarget.value)}
+                <Stack gap="xs">
+                  <Text size="xs" fw={500} c="dimmed">Subject (Required)</Text>
+                  <Textarea 
+                    placeholder="e.g. A cat wearing sunglasses"
+                    autosize
+                    minRows={2}
+                    value={aiParams.subject}
+                    onChange={(e) => setAiParams({...aiParams, subject: e.currentTarget.value})}
                   />
+
+                  <Text size="xs" fw={500} c="dimmed" mt={4}>Theme / Style</Text>
+                  <Select
+                    placeholder="Select style"
+                    data={['Photorealistic', 'Cartoon', '3D Render', 'Minimalist', 'Cyberpunk', 'Watercolor', 'Oil Painting']}
+                    value={aiParams.theme}
+                    onChange={(val) => setAiParams({...aiParams, theme: val || ''})}
+                    searchable
+                  />
+
+                  <Text size="xs" fw={500} c="dimmed" mt={4}>Background</Text>
+                  <TextInput
+                    placeholder="e.g. White studio, Nature, Office"
+                    value={aiParams.background}
+                    onChange={(e) => setAiParams({...aiParams, background: e.currentTarget.value})}
+                  />
+                  
+                  <SimpleGrid cols={2}>
+                      <div>
+                        <Text size="xs" fw={500} c="dimmed" mt={4}>Mood</Text>
+                        <Select
+                            placeholder="Select"
+                            data={['Happy', 'Professional', 'Dark', 'Energetic', 'Calm']}
+                            value={aiParams.mood}
+                            onChange={(val) => setAiParams({...aiParams, mood: val || ''})}
+                        />
+                      </div>
+                      <div>
+                        <Text size="xs" fw={500} c="dimmed" mt={4}>Purpose</Text>
+                        <Select
+                            placeholder="Select"
+                            data={['Social Media', 'Ad Banner', 'Logo', 'Website']}
+                            value={aiParams.purpose}
+                            onChange={(val) => setAiParams({...aiParams, purpose: val || ''})}
+                        />
+                      </div>
+                  </SimpleGrid>
+
                   <Button 
                     onClick={handleGenerateAI} 
-                    leftSection={<SparklesIcon size={16} />}
+                    leftSection={isGenerating ? <Loader size={16} color="white"/> : <SparklesIcon size={16} />}
+                    disabled={isGenerating || !aiParams.subject.trim()}
+                    fullWidth
+                    mt="sm"
+                    variant="gradient" 
+                    gradient={{ from: 'blue', to: 'cyan' }}
                   >
-                    Generate
+                    {isGenerating ? 'Generating...' : 'Generate Image'}
                   </Button>
                 </Stack>
               </Accordion.Panel>
             </Accordion.Item>
 
-            {/* 11. FIX: Removed Layouts section */}
-
           </Accordion> 
           : 
           <SimpleGrid cols={2} spacing="md">
             {Array(8).fill(0).map((_, i) => <div key={i} style={{
-          height: 120,
-          backgroundColor: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
-          borderRadius: theme.radius.md,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-                  <Text size="xs" color="dimmed">
-                    Template {i + 1}
-                  </Text>
-                </div>)}
+                height: 120,
+                backgroundColor: `light-dark(${theme.colors.gray[2]}, ${theme.colors.dark[6]})`,
+                borderRadius: theme.radius.md,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+             }}>
+                <Text size="xs" color="dimmed">
+                  Template {i + 1}
+                </Text>
+              </div>)}
           </SimpleGrid>}
       </ScrollArea>
     </Box>

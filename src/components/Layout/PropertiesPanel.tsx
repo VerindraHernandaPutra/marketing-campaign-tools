@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-// 1. FIX: Import 'Slider' and 'ColorInput'
-import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Button, TextInput, Box, Slider, ColorInput } from '@mantine/core';
+import { Text, ScrollArea, Stack, Divider, ColorSwatch, Group, NumberInput, Select, Button, TextInput, Box, Slider, ColorInput, Tooltip, ActionIcon } from '@mantine/core';
 import { useFabricCanvas } from '../../context/CanvasContext';
 import { Object as FabricObject, Textbox, Rect, Circle, Triangle, Line, Ellipse, Polygon, Polyline } from 'fabric';
-import { RotateCcwIcon, RotateCwIcon } from 'lucide-react';
+import { RotateCcwIcon, RotateCwIcon, TrashIcon, ChevronsUpIcon, ChevronsDownIcon, ChevronUpIcon, ChevronDownIcon, LayersIcon } from 'lucide-react';
 
 interface PropertiesPanelProps {
   opened: boolean;
@@ -19,7 +18,6 @@ const isShape = (obj: FabricObject | null): obj is (Rect | Circle | Triangle | L
   return ['rect', 'circle', 'triangle', 'line', 'ellipse', 'polygon', 'polyline'].includes(obj.type || '');
 };
 
-
 const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const { canvas, selectedObject } = useFabricCanvas();
   
@@ -30,7 +28,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   const [height, setHeight] = useState(selectedObject?.getScaledHeight() || 100);
   const [angle, setAngle] = useState(selectedObject?.get('angle') || 0);
 
-  // 2. FIX: Add state for new properties
   const [fillColor, setFillColor] = useState(selectedObject?.get('fill') as string || '#000000');
   const [strokeColor, setStrokeColor] = useState(selectedObject?.get('stroke') as string || '#000000');
   const [strokeWidth, setStrokeWidth] = useState(selectedObject?.get('strokeWidth') || 0);
@@ -42,7 +39,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
       setHeight(selectedObject.getScaledHeight());
       setAngle(selectedObject.get('angle') || 0);
 
-      // 3. FIX: Load new properties when selected object changes
       setFillColor(selectedObject.get('fill') as string || '#000000');
       setStrokeColor(selectedObject.get('stroke') as string || '#000000');
       setStrokeWidth(selectedObject.get('strokeWidth') || 0);
@@ -56,22 +52,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
 
   const handlePropertyChange = (property: string, value: string | number | boolean | undefined) => {
     if (!canvas || !selectedObject) return;
-    
     selectedObject.set(property, value);
-
-    if (property === 'angle') {
-      setAngle(Number(value) || 0);
-    }
-    // 4. FIX: Sync stroke width state
-    if (property === 'strokeWidth') {
-      setStrokeWidth(Number(value) || 0);
-    }
-    
+    if (property === 'angle') setAngle(Number(value) || 0);
+    if (property === 'strokeWidth') setStrokeWidth(Number(value) || 0);
     selectedObject.setCoords();
     canvas.renderAll();
   };
 
-  // 5. FIX: Simplify Fill handler
   const handleFillChange = (color: string) => {
     if (!canvas || !selectedObject) return;
     setFillColor(color);
@@ -79,7 +66,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
     canvas.renderAll();
   };
 
-  // 6. FIX: Add new Stroke Color handler
   const handleStrokeChange = (color: string) => {
     if (!canvas || !selectedObject) return;
     setStrokeColor(color);
@@ -89,7 +75,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   
   const handleOpacityChange = (value: number) => {
     if (!canvas || !selectedObject) return;
-    
     setOpacity(value); 
     selectedObject.set('opacity', value);
     canvas.renderAll();
@@ -97,7 +82,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canvas || !isTextbox(selectedObject)) return;
-    
     const newText = e.currentTarget.value;
     setText(newText); 
     selectedObject.set('text', newText);
@@ -106,7 +90,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
 
   const handleFontSizeChange = (value: number | string) => {
     if (!canvas || !isTextbox(selectedObject)) return;
-    
     const newSize = Number(value);
     setFontSize(newSize);
     selectedObject.set('fontSize', newSize);
@@ -115,42 +98,57 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   
   const handleDimensionChange = (dim: 'width' | 'height', value: number | string) => {
     if (!canvas || !selectedObject) return;
-
     const numValue = Number(value);
-
     if (dim === 'width') {
       setWidth(numValue);
-      if (selectedObject.width) {
-        selectedObject.set('scaleX', numValue / selectedObject.width);
-      }
+      if (selectedObject.width) selectedObject.set('scaleX', numValue / selectedObject.width);
     } else {
       setHeight(numValue);
-      if (selectedObject.height) {
-        selectedObject.set('scaleY', numValue / selectedObject.height);
-      }
+      if (selectedObject.height) selectedObject.set('scaleY', numValue / selectedObject.height);
     }
-    
     selectedObject.setCoords();
     canvas.renderAll();
   };
 
   const handleRotate = (direction: 'left' | 'right') => {
     if (!canvas || !selectedObject) return;
-
     const currentAngle = angle;
-    let newAngle;
-
-    if (direction === 'right') {
-      newAngle = currentAngle + 90;
-    } else {
-      newAngle = currentAngle - 90;
-    }
-
+    let newAngle = direction === 'right' ? currentAngle + 90 : currentAngle - 90;
     newAngle = (newAngle + 360) % 360;
-
     setAngle(newAngle);
     selectedObject.set('angle', newAngle);
     selectedObject.setCoords();
+    canvas.renderAll();
+  };
+
+  // --- FIXED: Layering Functions ---
+  const handleLayerPosition = (action: 'front' | 'back' | 'forward' | 'backward') => {
+    if (!canvas || !selectedObject) return;
+
+    switch (action) {
+      case 'front':
+        canvas.bringObjectToFront(selectedObject);
+        break;
+      case 'back':
+        canvas.sendObjectToBack(selectedObject);
+        break;
+      case 'forward':
+        canvas.bringObjectForward(selectedObject);
+        break;
+      case 'backward':
+        canvas.sendObjectBackwards(selectedObject);
+        break;
+    }
+    // Important: discard active object might be needed if visual glitches occur,
+    // but usually renderAll is enough. 
+    canvas.renderAll();
+  };
+
+  // --- FIXED: Delete Function ---
+  const handleDelete = () => {
+    if (!canvas || !selectedObject) return;
+    canvas.remove(selectedObject);
+    canvas.discardActiveObject();
     canvas.renderAll();
   };
 
@@ -160,9 +158,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
   if (!selectedObject) {
     return (
       <Box p="md" w={300}>
-        <Text size="sm" ta="center" c="dimmed" mt="lg">
-          Select an object to edit properties
-        </Text>
+        <Text size="sm" ta="center" c="dimmed" mt="lg">Select an object to edit properties</Text>
       </Box>
     );
   }
@@ -198,46 +194,21 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
           <Stack gap="md">
             <div>
               <Text size="xs" fw={500} mb={4}>Width</Text>
-              <NumberInput 
-                value={Math.round(width)}
-                onChange={val => handleDimensionChange('width', val)}
-              />
+              <NumberInput value={Math.round(width)} onChange={val => handleDimensionChange('width', val)} />
             </div>
             <div>
               <Text size="xs" fw={500} mb={4}>Height</Text>
-              <NumberInput 
-                value={Math.round(height)}
-                onChange={val => handleDimensionChange('height', val)}
-              />
+              <NumberInput value={Math.round(height)} onChange={val => handleDimensionChange('height', val)} />
             </div>
             <div>
               <Text size="xs" fw={500} mb={4}>Rotation</Text>
-              <NumberInput 
-                value={Math.round(angle)}
-                onChange={(val) => handlePropertyChange('angle', Number(val))}
-                min={0}
-                max={360}
-                step={1}
-                suffix="°"
-              />
+              <NumberInput value={Math.round(angle)} onChange={(val) => handlePropertyChange('angle', Number(val))} min={0} max={360} step={1} suffix="°" />
             </div>
             <div>
               <Text size="xs" fw={500} mb={4}>Rotate</Text>
               <Group grow>
-                <Button 
-                  variant="default" 
-                  leftSection={<RotateCcwIcon size={16} />}
-                  onClick={() => handleRotate('left')}
-                >
-                  Left
-                </Button>
-                <Button 
-                  variant="default" 
-                  leftSection={<RotateCwIcon size={16} />}
-                  onClick={() => handleRotate('right')}
-                >
-                  Right
-                </Button>
+                <Button variant="default" leftSection={<RotateCcwIcon size={16} />} onClick={() => handleRotate('left')}>Left</Button>
+                <Button variant="default" leftSection={<RotateCwIcon size={16} />} onClick={() => handleRotate('right')}>Right</Button>
               </Group>
             </div>
           </Stack>
@@ -245,76 +216,74 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = () => {
 
         <Divider my="md" />
         
-        {/* 7. FIX: Updated Fill Color section */}
         <div>
-          <Text size="xs" fw={500} mb={4}>
-            Fill Color
-          </Text>
-          <ColorInput
-            value={fillColor}
-            onChange={handleFillChange}
-            format="hex"
-            placeholder="Custom color"
-          />
+          <Text size="xs" fw={500} mb={4}>Fill Color</Text>
+          <ColorInput value={fillColor} onChange={handleFillChange} format="hex" placeholder="Custom color" />
           <Group gap="xs" mt="xs">
             {colors.map(color => (
-              <ColorSwatch 
-                key={color} 
-                color={color} 
-                size={22} 
-                style={{ cursor: 'pointer', border: color === 'transparent' ? '1px solid #ccc' : 'none' }}
-                onClick={() => handleFillChange(color)}
-              />
+              <ColorSwatch key={color} color={color} size={22} style={{ cursor: 'pointer', border: color === 'transparent' ? '1px solid #ccc' : 'none' }} onClick={() => handleFillChange(color)} />
             ))}
           </Group>
         </div>
 
-        {/* 8. FIX: Added new Border/Stroke section */}
         <Stack gap="md" mt="md">
           <Divider />
           <div>
             <Text size="xs" fw={500} mb={4}>Border Color</Text>
-            <ColorInput
-              value={strokeColor}
-              onChange={handleStrokeChange}
-              format="hex"
-              placeholder="Custom color"
-            />
+            <ColorInput value={strokeColor} onChange={handleStrokeChange} format="hex" placeholder="Custom color" />
             <Group gap="xs" mt="xs">
               {colors.map(color => (
-                <ColorSwatch
-                  key={color}
-                  color={color}
-                  size={22}
-                  style={{ cursor: 'pointer', border: color === 'transparent' ? '1px solid #ccc' : 'none' }}
-                  onClick={() => handleStrokeChange(color)}
-                />
+                <ColorSwatch key={color} color={color} size={22} style={{ cursor: 'pointer', border: color === 'transparent' ? '1px solid #ccc' : 'none' }} onClick={() => handleStrokeChange(color)} />
               ))}
             </Group>
           </div>
           <div>
             <Text size="xs" fw={500} mb={4}>Border Width</Text>
-            <NumberInput
-              value={strokeWidth}
-              onChange={(val) => handlePropertyChange('strokeWidth', val)}
-              min={0}
-              step={1}
-            />
+            <NumberInput value={strokeWidth} onChange={(val) => handlePropertyChange('strokeWidth', val)} min={0} step={1} />
           </div>
         </Stack>
         
-        {/* 9. FIX: Kept Opacity as a Slider */}
         <div className="mt-4">
           <Divider my="md" />
           <Text size="xs" fw={500} mb={4}>Opacity</Text>
-          <Slider 
-            value={opacity} 
-            onChange={handleOpacityChange} 
-            min={0} 
-            max={1} 
-            step={0.01} 
-            label={(value) => `${Math.round(value * 100)}%`}
-          />
+          <Slider value={opacity} onChange={handleOpacityChange} min={0} max={1} step={0.01} label={(value) => `${Math.round(value * 100)}%`} />
+        </div>
+
+        <div className="mt-4">
+          <Divider my="md" />
+          <Group gap="xs" align="center" mb="xs">
+             <LayersIcon size={16} />
+             <Text size="xs" fw={500}>Position / Layers</Text>
+          </Group>
+          
+          <Group grow>
+            <Tooltip label="Bring to Front">
+              <ActionIcon variant="default" size="lg" onClick={() => handleLayerPosition('front')}>
+                <ChevronsUpIcon size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Bring Forward">
+              <ActionIcon variant="default" size="lg" onClick={() => handleLayerPosition('forward')}>
+                <ChevronUpIcon size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Send Backward">
+              <ActionIcon variant="default" size="lg" onClick={() => handleLayerPosition('backward')}>
+                <ChevronDownIcon size={18} />
+              </ActionIcon>
+            </Tooltip>
+             <Tooltip label="Send to Back">
+              <ActionIcon variant="default" size="lg" onClick={() => handleLayerPosition('back')}>
+                <ChevronsDownIcon size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </div>
+
+        <div className="mt-8 mb-4">
+           <Button color="red" variant="light" fullWidth leftSection={<TrashIcon size={16} />} onClick={handleDelete}>
+             Delete Element
+           </Button>
         </div>
       </ScrollArea>
     </Box>;

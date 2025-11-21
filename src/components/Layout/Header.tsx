@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Group, ActionIcon, Title, Button, Divider, Menu, useMantineColorScheme, Box, TextInput } from '@mantine/core';
-import { ArrowLeft, MenuIcon, SaveIcon, ShareIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon, ExpandIcon } from 'lucide-react';
+import { ArrowLeft, MenuIcon, SaveIcon, DownloadIcon, UndoIcon, RedoIcon, SlidersIcon, MoonIcon, SunIcon, ExpandIcon } from 'lucide-react';
 
 interface HeaderProps {
   sidebarOpened: boolean;
@@ -12,10 +12,9 @@ interface HeaderProps {
   onUpdateTitle: (newTitle: string) => void;
   onSave: () => void;
   onToggleResizeModal: () => void;
-  // 2. FIX: Add zoom props
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onFitToCanvas: () => void; // 3. FIX: Renamed prop
+  onFitToCanvas: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -25,10 +24,7 @@ const Header: React.FC<HeaderProps> = ({
   onUpdateTitle,
   onSave,
   onToggleResizeModal,
-  // 4. FIX: Destructure zoom props
-  onZoomIn,
-  onZoomOut,
-  onFitToCanvas // 5. FIX: Renamed prop
+  // Zoom props are kept in interface but removed from UI as 'View' menu is gone
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
@@ -91,15 +87,11 @@ const Header: React.FC<HeaderProps> = ({
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Item leftSection={<SaveIcon size={14} />} onClick={onSave}>Save</Menu.Item>
-                {/* 6. FIX: Use 'ExpandIcon' here */}
                 <Menu.Item leftSection={<ExpandIcon size={14} />} onClick={onToggleResizeModal}>
                   Resize
                 </Menu.Item>
                 <Menu.Item leftSection={<DownloadIcon size={14} />}>
                   Download
-                </Menu.Item>
-                <Menu.Item leftSection={<ShareIcon size={14} />}>
-                  Share
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
@@ -114,20 +106,6 @@ const Header: React.FC<HeaderProps> = ({
                 <Menu.Item leftSection={<RedoIcon size={14} />}>Redo</Menu.Item>
               </Menu.Dropdown>
             </Menu>
-            <Menu shadow="md" width={200}>
-              <Menu.Target>
-                <Button variant="subtle">
-                  View
-                </Button>
-              </Menu.Target>
-              {/* 7. FIX: Add onClick handlers for zoom */}
-              <Menu.Dropdown>
-                <Menu.Item onClick={onZoomIn}>Zoom In</Menu.Item>
-                <Menu.Item onClick={onZoomOut}>Zoom Out</Menu.Item>
-                {/* 8. FIX: Renamed item and updated onClick */}
-                <Menu.Item onClick={onFitToCanvas}>Fit to Canvas</Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
           </Group>
         </Group>
         <Group>
@@ -138,7 +116,6 @@ const Header: React.FC<HeaderProps> = ({
             Redo
           </Button>
           <Divider orientation="vertical" />
-          <Button color="blue">Share</Button>
           <ActionIcon onClick={() => toggleColorScheme()} size="lg" variant="outline" color={isDark ? 'yellow' : 'blue'}>
             {isDark ? <SunIcon size={18} /> : <MoonIcon size={18} />}
           </ActionIcon>
