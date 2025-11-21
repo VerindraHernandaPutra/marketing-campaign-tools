@@ -11,7 +11,8 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, context } = await req.json()
+    // FIX: Accept currentTitle and currentContent
+    const { imageBase64, context, currentTitle, currentContent } = await req.json()
 
     if (!imageBase64) {
       throw new Error('No image provided')
@@ -22,9 +23,40 @@ serve(async (req) => {
       throw new Error('Missing OpenAI API Key')
     }
 
-    const contextPrompt = context 
-      ? `IMPORTANT CONTEXT: The target audience matches this description: "${context}". ADAPT THE LANGUAGE, TONE, AND CULTURAL REFERENCES TO FIT THIS AUDIENCE.` 
-      : "Target audience: General global audience.";
+    // Determine the AI's mode: "Create" or "Refine"
+    const hasUserDraft = (currentTitle && currentTitle.trim().length > 0) || (currentContent && currentContent.trim().length > 0);
+
+    let userPrompt = "";
+    if (hasUserDraft) {
+        userPrompt = `
+        I have started writing a campaign. Please act as a professional editor and copywriter.
+        
+        MY DRAFT TITLE: "${currentTitle || ''}"
+        MY DRAFT CONTENT: "${currentContent || ''}"
+
+        TASK: 
+        1. Analyze the provided image.
+        2. Refine, polish, and complete my draft. 
+        3. Ensure the tone matches the image.
+        4. Fix any grammar issues.
+        5. If my draft is very short (e.g., just "Sale"), expand it into a full engaging post.
+        `;
+    } else {
+        userPrompt = "Generate a catchy marketing title and engaging caption for this image from scratch.";
+    }
+
+    const systemInstruction = `
+      You are a professional social media marketing expert.
+      
+      ${context ? `TARGET AUDIENCE CONTEXT: ${context}` : ''}
+      
+      CRITICAL INSTRUCTION: 
+      - If the target audience has a specific country, YOU MUST WRITE IN THAT COUNTRY'S NATIVE LANGUAGE.
+      - If the user provided a draft, improve it but keep their core message intent.
+      
+      Return ONLY a valid JSON object in this format: { "title": "string", "content": "string" }. 
+      Do not add markdown formatting like \`\`\`json.
+    `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -37,18 +69,12 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional social media marketing expert. 
-            Analyze the image provided and generate a catchy, engaging Campaign Title and a Caption (Content).
-            
-            ${contextPrompt}
-
-            Return ONLY a valid JSON object in this format: { "title": "string", "content": "string" }. 
-            Do not add markdown formatting like \`\`\`json.`
+            content: systemInstruction
           },
           {
             role: 'user',
             content: [
-              { type: "text", text: "Generate a marketing title and caption for this image." },
+              { type: "text", text: userPrompt },
               {
                 type: "image_url",
                 image_url: {
@@ -58,7 +84,7 @@ serve(async (req) => {
             ]
           }
         ],
-        max_tokens: 300,
+        max_tokens: 400,
       }),
     })
 

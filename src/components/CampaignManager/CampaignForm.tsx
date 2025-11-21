@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css'; 
-import { UploadIcon, SendIcon, ClockIcon, UsersIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
+import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react'; 
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -69,7 +69,6 @@ const CampaignForm: React.FC = () => {
         setContent(data.content || '');
         setSelectedPlatforms(data.platforms || []);
         if (data.scheduled_date) {
-            // Ensure this is a Date object
             setScheduledDate(new Date(data.scheduled_date));
         }
         if (data.platform_data) {
@@ -114,6 +113,29 @@ const CampaignForm: React.FC = () => {
     });
   };
 
+  // --- NEW: Detect Audience Context (Country/Language) ---
+  const getAudienceContext = async (): Promise<string> => {
+      if (!selectedGroupId) return "General Global Audience (English)";
+
+      const { data } = await supabase
+        .from('client_groups')
+        .select('clients(country)')
+        .eq('group_id', selectedGroupId)
+        .limit(5); 
+
+      if (!data || data.length === 0) return "General Global Audience";
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const countries = data.map((d: any) => d.clients?.country).filter(Boolean);
+      
+      if (countries.length === 0) return "General Global Audience";
+      
+      const detectedCountry = countries[0];
+      console.log("Detected Audience Country:", detectedCountry);
+      
+      return `Target Audience Location: ${detectedCountry}. The content MUST be in the official language of ${detectedCountry}.`;
+  };
+
   // --- AI GENERATION LOGIC ---
   const handleGenerateContent = async () => {
     let imageToAnalyze: string | null = null;
@@ -121,7 +143,7 @@ const CampaignForm: React.FC = () => {
     if (files.length > 0) {
         imageToAnalyze = await fileToBase64(files[0]);
     } else if (existingMedia.length > 0) {
-        alert("For AI generation, please upload a new image file directly. Analyzing existing URLs is currently limited.");
+        alert("For AI generation, please upload a new image file directly.");
         return;
     }
 
@@ -132,14 +154,15 @@ const CampaignForm: React.FC = () => {
 
     setIsGeneratingAI(true);
     try {
-        const audienceContext = selectedGroupId 
-          ? `Audience Group: ${groups.find(g => g.value === selectedGroupId)?.label}` 
-          : "General Audience";
-
+        const audienceContext = await getAudienceContext();
+        
         const { data, error } = await supabase.functions.invoke('generate-caption', {
             body: { 
                 imageBase64: imageToAnalyze,
-                context: audienceContext
+                context: audienceContext,
+                // FIX: Pass current input values to backend
+                currentTitle: title,
+                currentContent: content
             }
         });
 
@@ -306,24 +329,13 @@ const CampaignForm: React.FC = () => {
       const newUploadedUrls = await uploadFilesToStorage();
       const finalMediaList = [...existingMedia, ...newUploadedUrls];
 
-      // FIX: Safe date conversion to avoid "toISOString is not a function"
-      let scheduledDateISO = null;
-      if (scheduledDate) {
-          // If it's already a Date object, this works.
-          // If it's a string (from loading previously saved data), new Date() parses it.
-          const dateObj = new Date(scheduledDate);
-          if (!isNaN(dateObj.getTime())) {
-             scheduledDateISO = dateObj.toISOString();
-          }
-      }
-
       const campaignData = {
           user_id: user.id,
           title: title,
           content: content,
           platforms: selectedPlatforms,
           status: status,
-          scheduled_date: scheduledDateISO,
+          scheduled_date: scheduledDate,
           platform_data: { 
               ...platformData, 
               target_group_id: selectedGroupId,
@@ -441,18 +453,28 @@ const CampaignForm: React.FC = () => {
         <Box mt="xl">
           {activeStep === 0 && (
              <Box>
-               {/* AI Generator Button */}
-               <Group justify="flex-end" mb="xs">
-                 <Button 
-                    variant="gradient" 
-                    gradient={{ from: 'indigo', to: 'cyan' }} 
-                    leftSection={<SparklesIcon size={16} />}
-                    onClick={handleGenerateContent}
-                    loading={isGeneratingAI}
-                    disabled={files.length === 0 && existingMedia.length === 0}
-                 >
-                    Auto-fill with AI
-                 </Button>
+               {/* Target Audience Selection in Step 1 for AI Context */}
+               <Group justify="space-between" mb="md">
+                   <Select
+                        label="Target Audience (for AI context)"
+                        placeholder="Select group to tailor content"
+                        data={groups}
+                        value={selectedGroupId}
+                        onChange={setSelectedGroupId}
+                        clearable
+                        w={300}
+                    />
+                    <Button 
+                        variant="gradient" 
+                        gradient={{ from: 'indigo', to: 'cyan' }} 
+                        leftSection={<SparklesIcon size={16} />}
+                        onClick={handleGenerateContent}
+                        loading={isGeneratingAI}
+                        disabled={files.length === 0 && existingMedia.length === 0}
+                    >
+                        {/* Logic to change button text based on existing inputs */}
+                        {(title || content) ? 'Refine Draft with AI' : 'Auto-fill with AI'}
+                    </Button>
                </Group>
 
                <TextInput label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required mb="md" />
@@ -531,17 +553,10 @@ const CampaignForm: React.FC = () => {
 
           {activeStep === 2 && (
             <Box>
-                <Title order={4} mb="md">Target Audience</Title>
-                <Select
-                    label="Select a Client Group"
-                    placeholder="Choose a group (e.g. VIP Clients)"
-                    data={groups}
-                    value={selectedGroupId}
-                    onChange={setSelectedGroupId}
-                    clearable
-                    mb="xl"
-                    leftSection={<UsersIcon size={16}/>}
-                />
+                <Title order={4} mb="md">Review Targeting</Title>
+                <Text mb="md">
+                    Selected Group: <b>{groups.find(g => g.value === selectedGroupId)?.label || "None"}</b>
+                </Text>
                 {renderFlow()}
             </Box>
           )}
