@@ -316,7 +316,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
             <Accordion.Item value="ai">
               <Accordion.Control icon={<SparklesIcon size={18} />}>
-                AI Generator (Beta)
+                AI Image Generator
               </Accordion.Control>
               <Accordion.Panel>
                 <Stack gap="xs">

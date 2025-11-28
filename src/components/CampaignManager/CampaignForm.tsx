@@ -5,7 +5,7 @@ import '@mantine/dates/styles.css';
 import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
-import { useNavigate, useParams, useLocation } from 'react-router-dom'; // Added useLocation
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import PlatformSelector from './PlatformSelector';
 import WhatsappFlow from './flows/WhatsappFlow';
 import EmailFlow from './flows/EmailFlow';
@@ -16,7 +16,7 @@ const CampaignForm: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { campaignId } = useParams();
-  const location = useLocation(); // Hook to access state passed from DesignCard
+  const location = useLocation();
 
   const [activeStep, setActiveStep] = useState(0);
   const [title, setTitle] = useState('');
@@ -47,23 +47,18 @@ const CampaignForm: React.FC = () => {
     if (state?.importedDesign) {
       const { title: designTitle, thumbnail } = state.importedDesign;
       
-      // Auto-fill Title if empty
       if (!title && designTitle) setTitle(designTitle);
       
-      // Auto-add Thumbnail to media list
       if (thumbnail) {
-         // Avoid duplicates if effect runs twice
          setExistingMedia(prev => {
             if (prev.includes(thumbnail)) return prev;
             return [...prev, thumbnail];
          });
       }
-      
-      // Optional: Clear state to prevent re-adding on refresh (though browser usually handles this)
       window.history.replaceState({}, document.title);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []); 
 
 
   useEffect(() => {
@@ -140,7 +135,6 @@ const CampaignForm: React.FC = () => {
     });
   };
 
-  // --- NEW: Detect Audience Context (Country/Language) ---
   const getAudienceContext = async (): Promise<string> => {
       if (!selectedGroupId) return "General Global Audience (English)";
 
@@ -163,7 +157,6 @@ const CampaignForm: React.FC = () => {
       return `Target Audience Location: ${detectedCountry}. The content MUST be in the official language of ${detectedCountry}.`;
   };
 
-  // --- AI GENERATION LOGIC ---
   const handleGenerateContent = async () => {
     let imageToAnalyze: string | null = null;
 
@@ -503,8 +496,23 @@ const CampaignForm: React.FC = () => {
                     </Button>
                </Group>
 
-               <TextInput label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required mb="md" />
-               <Textarea label="Content" value={content} onChange={(e) => setContent(e.currentTarget.value)} minRows={4} required mb="md" />
+               <TextInput 
+                 label="Title" 
+                 placeholder="e.g. Summer Sale Campaign 2024" 
+                 value={title} 
+                 onChange={(e) => setTitle(e.currentTarget.value)} 
+                 required 
+                 mb="md" 
+               />
+               <Textarea 
+                 label="Content" 
+                 placeholder="Write your engaging caption here... (e.g., 'Don't miss out on our exclusive summer deals! ☀️ #SummerSale')"
+                 value={content} 
+                 onChange={(e) => setContent(e.currentTarget.value)} 
+                 minRows={4} 
+                 required 
+                 mb="md" 
+               />
                
                <Text size="sm" fw={500} mb="xs">Media</Text>
                <Group>
@@ -590,7 +598,14 @@ const CampaignForm: React.FC = () => {
           {activeStep === 3 && (
             <Box>
                <Text mb="sm">Pick a date to schedule, or use "Post Now".</Text>
-               <DateTimePicker label="Schedule" value={scheduledDate} onChange={setScheduledDate} minDate={new Date()} clearable />
+               <DateTimePicker 
+                 label="Schedule" 
+                 placeholder="Pick a date and time" 
+                 value={scheduledDate} 
+                 onChange={setScheduledDate} 
+                 minDate={new Date()} 
+                 clearable 
+               />
             </Box>
           )}
         </Box>
