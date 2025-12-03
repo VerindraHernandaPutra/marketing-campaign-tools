@@ -354,7 +354,7 @@ const CampaignForm: React.FC = () => {
           content: content,
           platforms: selectedPlatforms,
           status: status,
-          scheduled_date: scheduledDate ? scheduledDate.toISOString() : null,
+          scheduled_date: scheduledDate ? new Date(scheduledDate).toISOString() : null,
           platform_data: { 
               ...platformData, 
               target_group_id: selectedGroupId,

@@ -55,7 +55,8 @@ const Header: React.FC<HeaderProps> = ({
     <Box p="xs" h={60}>
       <Group justify="space-between" style={{ height: '100%' }}>
         <Group>
-          <ActionIcon onClick={() => navigate('/campaign-manager')} size="lg">
+          {/* PERUBAHAN DI SINI: Navigasi ke Dashboard ('/') */}
+          <ActionIcon onClick={() => navigate('/')} size="lg">
             <ArrowLeft size={20} />
           </ActionIcon>
           <ActionIcon onClick={onToggleSidebar} size="lg">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, TextInput, Button, Stack, Loader, Select, Textarea } from '@mantine/core';
+import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, TextInput, Button, Stack, Loader, Select, Textarea, SegmentedControl, Collapse, Tooltip, NumberInput } from '@mantine/core';
 import { 
   ImageIcon, 
   TypeIcon, 
@@ -11,7 +11,15 @@ import {
   HexagonIcon, 
   MinusIcon, 
   BaselineIcon, 
-  SparklesIcon
+  SparklesIcon,
+  Wand2Icon,
+  Settings2Icon,
+  InfoIcon,
+  PaletteIcon,
+  CameraIcon,
+  SunIcon,
+  MaximizeIcon,
+  ScalingIcon
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
 import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline, Image as FabricImage } from 'fabric';
@@ -28,13 +36,26 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const { canvas } = useFabricCanvas();
 
-  // Structured AI Input State
+  // Mode state: 'basic' or 'advanced'
+  const [promptMode, setPromptMode] = useState('basic');
+
+  // Comprehensive AI Input State
   const [aiParams, setAiParams] = useState({
     subject: '',
     theme: '',
     background: '',
     mood: '',
-    purpose: ''
+    purpose: '',
+    negativePrompt: '',
+    // Advanced Fields
+    lighting: '',
+    composition: '',
+    colorPalette: '',
+    texture: '',
+    aspectRatio: 'square', // square, landscape, portrait, custom
+    width: 1024,
+    height: 1024,
+    quality: 'standard'
   });
 
   const addShape = (shapeType: 'rect' | 'circle' | 'triangle' | 'line' | 'ellipse' | 'polygon' | 'polyline') => {
@@ -171,7 +192,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
   };
 
   const handleGenerateAI = async () => {
-    // Validation: At least a subject is required
     if (!aiParams.subject.trim() || !canvas) return;
     
     setIsGenerating(true);
@@ -188,9 +208,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
             
             const canvasWidth = canvas.getWidth();
             const canvasHeight = canvas.getHeight();
+            // Scale logic remains simple to fit screen, 
+            // but aspect ratio will be preserved from the backend generation
             const scale = Math.min(
-                (canvasWidth * 0.5) / (img.width || canvasWidth), 
-                (canvasHeight * 0.5) / (img.height || canvasHeight)
+                (canvasWidth * 0.6) / (img.width || canvasWidth), 
+                (canvasHeight * 0.6) / (img.height || canvasHeight)
             );
 
             img.set({
@@ -320,11 +342,39 @@ const Sidebar: React.FC<SidebarProps> = () => {
               </Accordion.Control>
               <Accordion.Panel>
                 <Stack gap="xs">
+                  <SegmentedControl
+                    value={promptMode}
+                    onChange={setPromptMode}
+                    data={[
+                      { 
+                        label: (
+                          <Group gap={6}>
+                            <Wand2Icon size={14} />
+                            <Text size="xs">Basic</Text>
+                          </Group>
+                        ), 
+                        value: 'basic' 
+                      },
+                      { 
+                        label: (
+                          <Group gap={6}>
+                            <Settings2Icon size={14} />
+                            <Text size="xs">Advanced</Text>
+                          </Group>
+                        ), 
+                        value: 'advanced' 
+                      },
+                    ]}
+                    size="xs"
+                    fullWidth
+                    mb="xs"
+                  />
+
                   <Text size="xs" fw={500} c="dimmed">Subject (Required)</Text>
                   <Textarea 
                     placeholder="e.g. A cat wearing sunglasses"
                     autosize
-                    minRows={2}
+                    minRows={3}
                     value={aiParams.subject}
                     onChange={(e) => setAiParams({...aiParams, subject: e.currentTarget.value})}
                   />
@@ -332,39 +382,202 @@ const Sidebar: React.FC<SidebarProps> = () => {
                   <Text size="xs" fw={500} c="dimmed" mt={4}>Theme / Style</Text>
                   <Select
                     placeholder="Select style"
-                    data={['Photorealistic', 'Cartoon', '3D Render', 'Minimalist', 'Cyberpunk', 'Watercolor', 'Oil Painting']}
+                    data={[
+                      'Photorealistic', 'Cinematic', '3D Render', 'Anime', 'Digital Art', 
+                      'Oil Painting', 'Watercolor', 'Cyberpunk', 'Minimalist', 'Sketch', 
+                      'Vintage', 'Pop Art', 'Isometric'
+                    ]}
                     value={aiParams.theme}
                     onChange={(val) => setAiParams({...aiParams, theme: val || ''})}
                     searchable
+                    clearable
                   />
 
-                  <Text size="xs" fw={500} c="dimmed" mt={4}>Background</Text>
-                  <TextInput
-                    placeholder="e.g. White studio, Nature, Office"
-                    value={aiParams.background}
-                    onChange={(e) => setAiParams({...aiParams, background: e.currentTarget.value})}
-                  />
-                  
-                  <SimpleGrid cols={2}>
-                      <div>
-                        <Text size="xs" fw={500} c="dimmed" mt={4}>Mood</Text>
-                        <Select
+                  {/* ADVANCED FIELDS */}
+                  <Collapse in={promptMode === 'advanced'}>
+                    <Stack gap="xs" mt="xs">
+                      <Divider label="Visual Details" labelPosition="center" />
+                      
+                      <SimpleGrid cols={2}>
+                        <div>
+                          <Group gap={4} mb={2}>
+                            <SunIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Lighting</Text>
+                          </Group>
+                          <Select
                             placeholder="Select"
-                            data={['Happy', 'Professional', 'Dark', 'Energetic', 'Calm']}
-                            value={aiParams.mood}
-                            onChange={(val) => setAiParams({...aiParams, mood: val || ''})}
+                            data={['Natural', 'Studio', 'Neon', 'Golden Hour', 'Cinematic', 'Dark/Moody', 'Softbox']}
+                            value={aiParams.lighting}
+                            onChange={(val) => setAiParams({...aiParams, lighting: val || ''})}
+                            size="xs"
+                          />
+                        </div>
+                        <div>
+                          <Group gap={4} mb={2}>
+                            <PaletteIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Colors</Text>
+                          </Group>
+                          <Select
+                            placeholder="Select"
+                            data={['Vibrant', 'Pastel', 'Black & White', 'Warm Tone', 'Cool Tone', 'Muted', 'Neon']}
+                            value={aiParams.colorPalette}
+                            onChange={(val) => setAiParams({...aiParams, colorPalette: val || ''})}
+                            size="xs"
+                          />
+                        </div>
+                      </SimpleGrid>
+
+                      <SimpleGrid cols={2}>
+                        <div>
+                          <Group gap={4} mb={2}>
+                            <CameraIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Angle</Text>
+                          </Group>
+                          <Select
+                            placeholder="Select"
+                            data={['Wide Shot', 'Close Up', 'Macro', 'Drone View', 'Eye Level', 'Low Angle']}
+                            value={aiParams.composition}
+                            onChange={(val) => setAiParams({...aiParams, composition: val || ''})}
+                            size="xs"
+                          />
+                        </div>
+                        <div>
+                          <Group gap={4} mb={2}>
+                            <BoxIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Texture</Text>
+                          </Group>
+                          <Select
+                            placeholder="Select"
+                            data={['Smooth', 'Rough', 'Metallic', 'Wooden', 'Glass', 'Fabric', 'Paper']}
+                            value={aiParams.texture}
+                            onChange={(val) => setAiParams({...aiParams, texture: val || ''})}
+                            size="xs"
+                          />
+                        </div>
+                      </SimpleGrid>
+
+                      <Divider label="Context" labelPosition="center" mt="xs" />
+
+                      <Text size="xs" fw={500} c="dimmed">Background</Text>
+                      <TextInput
+                        placeholder="e.g. Busy street, White studio, Forest"
+                        value={aiParams.background}
+                        onChange={(e) => setAiParams({...aiParams, background: e.currentTarget.value})}
+                        size="xs"
+                      />
+
+                      <SimpleGrid cols={2}>
+                          <div>
+                            <Text size="xs" fw={500} c="dimmed">Mood</Text>
+                            <Select
+                                placeholder="Select"
+                                data={['Happy', 'Professional', 'Dark', 'Energetic', 'Calm', 'Mysterious', 'Romantic']}
+                                value={aiParams.mood}
+                                onChange={(val) => setAiParams({...aiParams, mood: val || ''})}
+                                size="xs"
+                            />
+                          </div>
+                          <div>
+                            <Text size="xs" fw={500} c="dimmed">Purpose</Text>
+                            <Select
+                                placeholder="Select"
+                                data={['Social Media', 'Ad Banner', 'Logo', 'Website', 'Wallpaper']}
+                                value={aiParams.purpose}
+                                onChange={(val) => setAiParams({...aiParams, purpose: val || ''})}
+                                size="xs"
+                            />
+                          </div>
+                      </SimpleGrid>
+
+                      <Divider label="Format & Quality" labelPosition="center" mt="xs" />
+
+                      <SimpleGrid cols={2}>
+                        <div>
+                           <Group gap={4} mb={2}>
+                            <MaximizeIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Aspect Ratio</Text>
+                          </Group>
+                          <Select
+                            value={aiParams.aspectRatio}
+                            onChange={(val) => setAiParams({...aiParams, aspectRatio: val || 'square'})}
+                            data={[
+                              { value: 'square', label: 'Square (1:1)' },
+                              { value: 'landscape', label: 'Landscape (16:9)' },
+                              { value: 'portrait', label: 'Portrait (9:16)' },
+                              { value: 'custom', label: 'Custom Size' }
+                            ]}
+                            size="xs"
+                            allowDeselect={false}
+                          />
+                        </div>
+                        <div>
+                           <Group gap={4} mb={2}>
+                            <SparklesIcon size={12} style={{ opacity: 0.7 }} />
+                            <Text size="xs" fw={500} c="dimmed">Quality</Text>
+                          </Group>
+                          <Select
+                            value={aiParams.quality}
+                            onChange={(val) => setAiParams({...aiParams, quality: val || 'standard'})}
+                            data={[
+                              { value: 'standard', label: 'Standard' },
+                              { value: 'hd', label: 'High Def (HD)' }
+                            ]}
+                            size="xs"
+                            allowDeselect={false}
+                          />
+                        </div>
+                      </SimpleGrid>
+
+                      {/* CUSTOM SIZE INPUTS */}
+                      <Collapse in={aiParams.aspectRatio === 'custom'}>
+                        <SimpleGrid cols={2} mt="xs">
+                            <div>
+                                <Group gap={4} mb={2}>
+                                    <ScalingIcon size={12} style={{ opacity: 0.7 }} />
+                                    <Text size="xs" fw={500} c="dimmed">Width (px)</Text>
+                                </Group>
+                                <NumberInput
+                                    value={aiParams.width}
+                                    onChange={(val) => setAiParams({...aiParams, width: Number(val) || 1024})}
+                                    size="xs"
+                                    min={256}
+                                    max={2048}
+                                />
+                            </div>
+                            <div>
+                                <Group gap={4} mb={2}>
+                                    <ScalingIcon size={12} style={{ opacity: 0.7 }} />
+                                    <Text size="xs" fw={500} c="dimmed">Height (px)</Text>
+                                </Group>
+                                <NumberInput
+                                    value={aiParams.height}
+                                    onChange={(val) => setAiParams({...aiParams, height: Number(val) || 1024})}
+                                    size="xs"
+                                    min={256}
+                                    max={2048}
+                                />
+                            </div>
+                        </SimpleGrid>
+                      </Collapse>
+
+                      <div>
+                        <Group gap={4} mt={4}>
+                          <Text size="xs" fw={500} c="dimmed" c="red.4">Negative Prompt</Text>
+                          <Tooltip label="Describe what you do NOT want in the image">
+                            <InfoIcon size={12} style={{ opacity: 0.5 }} />
+                          </Tooltip>
+                        </Group>
+                        <Textarea 
+                          placeholder="e.g. blurry, low quality, text, distorted"
+                          autosize
+                          minRows={2}
+                          value={aiParams.negativePrompt}
+                          onChange={(e) => setAiParams({...aiParams, negativePrompt: e.currentTarget.value})}
+                          size="xs"
                         />
                       </div>
-                      <div>
-                        <Text size="xs" fw={500} c="dimmed" mt={4}>Purpose</Text>
-                        <Select
-                            placeholder="Select"
-                            data={['Social Media', 'Ad Banner', 'Logo', 'Website']}
-                            value={aiParams.purpose}
-                            onChange={(val) => setAiParams({...aiParams, purpose: val || ''})}
-                        />
-                      </div>
-                  </SimpleGrid>
+                    </Stack>
+                  </Collapse>
 
                   <Button 
                     onClick={handleGenerateAI} 
@@ -373,9 +586,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
                     fullWidth
                     mt="sm"
                     variant="gradient" 
-                    gradient={{ from: 'blue', to: 'cyan' }}
+                    gradient={{ from: 'indigo', to: 'cyan' }}
                   >
-                    {isGenerating ? 'Generating...' : 'Generate Image'}
+                    {isGenerating ? 'Generating Magic...' : 'Generate Image'}
                   </Button>
                 </Stack>
               </Accordion.Panel>

@@ -11,7 +11,6 @@ serve(async (req) => {
   }
 
   try {
-    // FIX: Accept structured params instead of just 'prompt'
     const { params } = await req.json()
 
     if (!params || !params.subject) {
@@ -23,21 +22,64 @@ serve(async (req) => {
       throw new Error('Missing OpenAI API Key')
     }
 
-    // Construct a highly detailed prompt based on the structured JSON
-    // This follows the "Best Practice" of using specific attributes to guide generation
-    const detailedPrompt = `
+    // --- 1. Smart Aspect Ratio & Size Mapping ---
+    // DALL-E 3 currently supports specific sizes: 1024x1024, 1792x1024, 1024x1792.
+    // If 'custom' is selected, we map to the closest supported aspect ratio to prevent API errors,
+    // while instructing the AI about the intended composition.
+    
+    let size = "1024x1024"; // Default Square
+    let compositionInstruction = "";
+
+    if (params.aspectRatio === 'landscape') {
+        size = "1792x1024";
+    } else if (params.aspectRatio === 'portrait') {
+        size = "1024x1792";
+    } else if (params.aspectRatio === 'custom' && params.width && params.height) {
+        // Simple logic to pick the best DALL-E 3 container
+        const ratio = params.width / params.height;
+        if (ratio > 1.2) {
+            size = "1792x1024"; // Wide
+            compositionInstruction = `(Intended for wide custom crop: ${params.width}x${params.height})`;
+        } else if (ratio < 0.8) {
+            size = "1024x1792"; // Tall
+            compositionInstruction = `(Intended for tall custom crop: ${params.width}x${params.height})`;
+        } else {
+            size = "1024x1024"; // Square-ish
+            compositionInstruction = `(Intended for custom square crop: ${params.width}x${params.height})`;
+        }
+    }
+
+    // --- 2. Construct Advanced Prompt ---
+    let detailedPrompt = `
       Create an image with the following specifications:
       - **Subject**: ${params.subject}
       - **Theme/Style**: ${params.theme || 'Realistic'}
-      - **Background**: ${params.background || 'Neutral studio lighting'}
-      - **Mood/Tone**: ${params.mood || 'Professional'}
-      - **Purpose/Context**: ${params.purpose || 'General Marketing'}
-      
-      Ensure the image is high quality, visually striking, and perfectly matches the description above.
     `.trim();
 
-    console.log("Generated Prompt:", detailedPrompt);
+    // Adding precision details
+    if (params.background) detailedPrompt += `\n- **Background**: ${params.background}`;
+    if (params.mood) detailedPrompt += `\n- **Mood/Atmosphere**: ${params.mood}`;
+    if (params.lighting) detailedPrompt += `\n- **Lighting**: ${params.lighting}`;
+    
+    // Merge explicit composition setting with our custom size hint
+    let comp = params.composition || "";
+    if (compositionInstruction) comp += " " + compositionInstruction;
+    if (comp) detailedPrompt += `\n- **Camera/Composition**: ${comp}`;
 
+    if (params.colorPalette) detailedPrompt += `\n- **Color Palette**: ${params.colorPalette}`;
+    if (params.texture) detailedPrompt += `\n- **Texture/Material**: ${params.texture}`;
+    if (params.purpose) detailedPrompt += `\n- **Context/Purpose**: ${params.purpose}`;
+    
+    if (params.negativePrompt) {
+      detailedPrompt += `\n- **Negative Prompt (AVOID THESE)**: ${params.negativePrompt} (Ensure these elements do NOT appear)`;
+    }
+
+    detailedPrompt += `\n\nEnsure the image is high quality, visually striking, and strictly follows the details above.`;
+
+    console.log("Generated Prompt:", detailedPrompt);
+    console.log("Config:", { size, quality: params.quality || 'standard' });
+
+    // --- 3. Call OpenAI DALL-E 3 ---
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -48,9 +90,9 @@ serve(async (req) => {
         model: 'dall-e-3',
         prompt: detailedPrompt,
         n: 1,
-        size: "1024x1024",
+        size: size,
         response_format: "b64_json",
-        quality: "standard"
+        quality: params.quality || "standard"
       }),
     })
 
