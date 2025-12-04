@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader, Badge } from '@mantine/core';
 import { LayoutIcon, FacebookIcon, InstagramIcon, MailIcon } from 'lucide-react';
-import { Navigate } from 'react-router-dom'; // Import Navigate
+import { Navigate } from 'react-router-dom';
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
 import MetricsCard from '../Analytics/MetricsCard'; 
@@ -21,18 +21,16 @@ type Project = {
 };
 
 const DashboardContent: React.FC = () => {
-  // 1. ALL HOOKS MUST BE CALLED AT THE TOP LEVEL unconditionally
   const { user } = useAuth();
   const { role, isSuperAdmin } = useUserRole();
   const [activeTab, setActiveTab] = useState<string | null>('recent');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Define role access helpers
   const isMarketer = role === 'marketer' && !isSuperAdmin;
-  const isDesigner = role === 'designer' || role === 'operator' || isSuperAdmin;
+  const isDesigner = role === 'designer' || role === 'operator';
 
-  // Hooks moved up before any return statements
+  // FIX: Moved useCallback ABOVE the conditional return
   const fetchRecentProjects = useCallback(async () => {
       if (!user) return;
       setLoading(true);
@@ -50,14 +48,15 @@ const DashboardContent: React.FC = () => {
       setLoading(false);
   }, [user]);
 
+  // FIX: Moved useEffect ABOVE the conditional return
   useEffect(() => {
-    // Only fetch if user is supposed to see designs
     if (activeTab === 'recent' && isDesigner) {
       fetchRecentProjects();
     }
   }, [activeTab, fetchRecentProjects, isDesigner]); 
 
-  // 2. NOW we can handle redirects or conditional returns safely
+  // --- REDIRECT SUPER ADMIN ---
+  // Now it is safe to return early because all hooks have been declared
   if (isSuperAdmin) {
       return <Navigate to="/admin" replace />;
   }

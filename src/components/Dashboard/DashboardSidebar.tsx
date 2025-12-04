@@ -9,11 +9,6 @@ const DashboardSidebar: React.FC = () => {
   const location = useLocation();
   const { role, isSuperAdmin, loadingRole } = useUserRole();
 
-  // Role Logic
-  const canAccessDesign = isSuperAdmin || role === 'operator' || role === 'designer';
-  const canAccessMarketing = isSuperAdmin || role === 'operator' || role === 'marketer';
-  const canAccessCRM = isSuperAdmin || role === 'operator';
-
   if (loadingRole) {
     return (
         <Box w={240} h="calc(100vh - 70px)" className="border-r border-gray-200 dark:border-gray-700" p="xl">
@@ -24,29 +19,40 @@ const DashboardSidebar: React.FC = () => {
     );
   }
 
+  // --- SUPER ADMIN VIEW ---
+  // Exclusive view: Hides all other menus as requested
+  if (isSuperAdmin) {
+    return (
+      <Box w={240} h="calc(100vh - 70px)" className="border-r border-gray-200 dark:border-gray-700">
+        <ScrollArea h="100%">
+          <Box p="md">
+            <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
+              Administration
+            </Text>
+            <NavLink 
+              label="Super Admin" 
+              leftSection={<ShieldIcon size={18} />} 
+              active={location.pathname.startsWith('/admin')} 
+              onClick={() => navigate('/admin')} 
+              color="red"
+              variant="filled"
+              className="mb-1"
+            />
+          </Box>
+        </ScrollArea>
+      </Box>
+    );
+  }
+
+  // --- STANDARD ROLE LOGIC ---
+  const canAccessDesign = role === 'operator' || role === 'designer';
+  const canAccessMarketing = role === 'operator' || role === 'marketer';
+  const canAccessCRM = role === 'operator';
+
   return (
     <Box w={240} h="calc(100vh - 70px)" className="border-r border-gray-200 dark:border-gray-700">
       <ScrollArea h="100%">
         <Box p="md">
-          {/* SUPER ADMIN ONLY */}
-          {isSuperAdmin && (
-            <>
-              <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
-                Administration
-              </Text>
-              <NavLink 
-                label="Super Admin" 
-                leftSection={<ShieldIcon size={18} />} 
-                active={location.pathname.startsWith('/admin')} 
-                onClick={() => navigate('/admin')} 
-                color="red"
-                variant="filled"
-                className="mb-1"
-              />
-              <Divider my="md" />
-            </>
-          )}
-
           <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
             Main Menu
           </Text>
@@ -78,12 +84,12 @@ const DashboardSidebar: React.FC = () => {
             </>
           )}
           
-          {/* CRM FEATURES (Operator/Admin Only) */}
+          {/* CRM FEATURES */}
           {canAccessCRM && (
             <>
               <Divider my="md" />
               <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
-                Customer
+                Organization
               </Text>
               <NavLink 
                 label="Clients" 
@@ -99,11 +105,6 @@ const DashboardSidebar: React.FC = () => {
                 onClick={() => navigate('/groups')} 
                 className="mb-1" 
               />
-
-              <Divider my="md" />
-              <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
-                User Management
-              </Text>
               <NavLink 
                 label="Users" 
                 leftSection={<UsersIcon size={18} />} 
