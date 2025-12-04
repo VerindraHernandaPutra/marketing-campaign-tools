@@ -5,6 +5,7 @@ import { AppRouter } from './AppRouter';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { AuthProvider } from './auth/AuthProvider';
+import { UserProvider } from './auth/UserContext';
 import { MantineProvider } from '@mantine/core';
 
 const container = document.getElementById('root');
@@ -14,7 +15,9 @@ root.render(
   <React.StrictMode>
     <MantineProvider>
       <AuthProvider>
-        <AppRouter />
+        <UserProvider>
+          <AppRouter />
+        </UserProvider>
       </AuthProvider>
     </MantineProvider>
   </React.StrictMode>

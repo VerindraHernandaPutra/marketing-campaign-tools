@@ -11,32 +11,54 @@ import Templates from './pages/Templates';
 import Clients from './pages/Clients';
 import Groups from './pages/Groups';
 import Profile from './pages/Profile';
+import AdminDashboard from './pages/AdminDashboard';
+import OrganizationDetails from './pages/OrganizationDetails'; // New Page
 import { LoginPage } from './pages/LoginPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { RoleGuard } from './components/Auth/RoleGuard';
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/editor/:projectId" element={<App />} />
-          
-          <Route path="/campaign-manager" element={<CampaignManager />} />
-          <Route path="/campaign-manager/new" element={<CampaignCreate />} />
-          <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
-          
-          <Route path="/scheduled" element={<ScheduledPosts />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/folders" element={<Folders />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/groups" element={<Groups />} />
-          
-          {/* FIX: Ensure this route is here */}
-          <Route path="/profile" element={<Profile />} /> 
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+
+            {/* SUPER ADMIN */}
+            <Route element={<RoleGuard allowedRoles={['admin']} />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+                {/* Admin drill-down view */}
+                <Route path="/admin/organization/:orgId" element={<OrganizationDetails />} />
+            </Route>
+
+            {/* OPERATOR - Organization Management */}
+            <Route element={<RoleGuard allowedRoles={['operator']} />}>
+                <Route path="/groups" element={<Groups />} />
+                <Route path="/clients" element={<Clients />} />
+                {/* Operator managing their own org users */}
+                <Route path="/organization/users" element={<OrganizationDetails />} />
+            </Route>
+
+            {/* DESIGNER & OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['designer', 'operator']} />}>
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/editor/:projectId" element={<App />} />
+                <Route path="/templates" element={<Templates />} />
+                <Route path="/folders" element={<Folders />} />
+            </Route>
+
+            {/* MARKETER & OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['marketer', 'operator']} />}>
+                <Route path="/campaign-manager" element={<CampaignManager />} />
+                <Route path="/campaign-manager/new" element={<CampaignCreate />} />
+                <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
+                <Route path="/scheduled" element={<ScheduledPosts />} />
+                <Route path="/analytics" element={<Analytics />} />
+            </Route>
+
         </Route>
       </Routes>
     </BrowserRouter>

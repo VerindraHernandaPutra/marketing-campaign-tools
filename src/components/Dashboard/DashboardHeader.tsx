@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Group, Menu, Avatar, Text, UnstyledButton, Box, Container } from '@mantine/core';
+import { Group, Menu, Avatar, Text, UnstyledButton, Box, Container, Badge, Loader } from '@mantine/core';
 import { UserIcon, LogOutIcon } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
+import { useUserRole } from '../../auth/UserContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 
@@ -12,6 +13,7 @@ interface DashboardHeaderProps {
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
   const { user, signOut } = useAuth();
+  const { role, isSuperAdmin, loadingRole } = useUserRole();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ username: string | null, avatar_url: string | null } | null>(null);
 
@@ -20,9 +22,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
     const getProfile = async () => {
       if (!user) return;
       
-      // FIX: Use 'maybeSingle()' instead of 'single()'
-      // 'single()' throws an error if 0 rows are returned (406 Not Acceptable).
-      // 'maybeSingle()' returns null data without throwing an error if 0 rows are found.
       const { data, error } = await supabase
         .from('profiles')
         .select('username, avatar_url')
@@ -30,7 +29,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
         .maybeSingle();
 
       if (error) {
-        console.warn("Profile fetch error (harmless if new user):", error.message);
+        console.warn("Profile fetch error:", error.message);
       } else if (data) {
         setProfile(data);
       }
@@ -41,6 +40,23 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
 
   const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
 
+  // --- Role Indicator Logic ---
+  let roleLabel = 'USER';
+  let roleColor = 'gray';
+
+  if (isSuperAdmin) {
+    roleLabel = 'SUPER ADMIN';
+    roleColor = 'red';
+  } else if (role) {
+    roleLabel = role.toUpperCase();
+    switch (role) {
+      case 'operator': roleColor = 'blue'; break;
+      case 'designer': roleColor = 'pink'; break;
+      case 'marketer': roleColor = 'cyan'; break;
+      default: roleColor = 'gray';
+    }
+  }
+
   return (
     <Box component="header" h={70} className="border-b border-gray-200 dark:border-gray-700">
       <Container size="xl" className="h-full">
@@ -50,6 +66,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
             <Text size="xl" fw={700} className="text-purple-600">
               Marketing Campaign Tools
             </Text>
+            {/* Header Badge Indicator */}
+            {!loadingRole && (
+               <Badge variant="light" color={roleColor} size="sm" className="hidden md:block">
+                  {roleLabel} CONSOLE
+               </Badge>
+            )}
           </Group>
 
           {/* Right Side: Profile Menu */}
@@ -58,23 +80,26 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = () => {
               <Menu.Target>
                 <UnstyledButton>
                   <Group gap="xs">
+                    <div className="text-right hidden sm:block">
+                        <Text size="sm" fw={500} style={{ lineHeight: 1.2 }}>{displayName}</Text>
+                        {loadingRole ? (
+                            <Loader size={10} color="gray" />
+                        ) : (
+                            <Text size="xs" c="dimmed" style={{ lineHeight: 1 }}>{roleLabel}</Text>
+                        )}
+                    </div>
                     <Avatar 
                       src={profile?.avatar_url} 
-                      color="blue" 
+                      color={roleColor} 
                       radius="xl"
                     >
-                      {/* Fallback icon if no image */}
                       {!profile?.avatar_url && <UserIcon size={20} />}
                     </Avatar>
-                    <div className="hidden sm:block">
-                        {/* Display dynamic name */}
-                        <Text size="sm" fw={500}>{displayName}</Text>
-                    </div>
                   </Group>
                 </UnstyledButton>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Label>Account</Menu.Label>
+                <Menu.Label>Account ({roleLabel})</Menu.Label>
                 <Menu.Item 
                   leftSection={<UserIcon size={14} />} 
                   onClick={() => navigate('/profile')}

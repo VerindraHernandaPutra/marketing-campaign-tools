@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader } from '@mantine/core';
-import { LayoutIcon, FacebookIcon, InstagramIcon, MailIcon } from 'lucide-react'; // Removed unused icons
+import { Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, Center, Loader, Badge } from '@mantine/core';
+import { LayoutIcon, FacebookIcon, InstagramIcon, MailIcon } from 'lucide-react';
+import { Navigate } from 'react-router-dom'; // Import Navigate
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
+import MetricsCard from '../Analytics/MetricsCard'; 
+import EngagementChart from '../Analytics/EngagementChart';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
+import { useUserRole } from '../../auth/UserContext';
 
 type Project = {
   id: string;
@@ -17,11 +21,18 @@ type Project = {
 };
 
 const DashboardContent: React.FC = () => {
+  // 1. ALL HOOKS MUST BE CALLED AT THE TOP LEVEL unconditionally
   const { user } = useAuth();
+  const { role, isSuperAdmin } = useUserRole();
   const [activeTab, setActiveTab] = useState<string | null>('recent');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Define role access helpers
+  const isMarketer = role === 'marketer' && !isSuperAdmin;
+  const isDesigner = role === 'designer' || role === 'operator' || isSuperAdmin;
+
+  // Hooks moved up before any return statements
   const fetchRecentProjects = useCallback(async () => {
       if (!user) return;
       setLoading(true);
@@ -40,11 +51,56 @@ const DashboardContent: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (activeTab === 'recent') {
+    // Only fetch if user is supposed to see designs
+    if (activeTab === 'recent' && isDesigner) {
       fetchRecentProjects();
     }
-  }, [activeTab, fetchRecentProjects]); 
+  }, [activeTab, fetchRecentProjects, isDesigner]); 
 
+  // 2. NOW we can handle redirects or conditional returns safely
+  if (isSuperAdmin) {
+      return <Navigate to="/admin" replace />;
+  }
+
+  const getGreeting = () => {
+      if (role === 'operator') return "Operator Dashboard";
+      if (role === 'designer') return "Designer Studio";
+      if (role === 'marketer') return "Marketing Hub";
+      return "Dashboard";
+  };
+
+  const getSubtitle = () => {
+      if (role === 'operator') return "Manage your organization's campaigns and designs";
+      if (role === 'designer') return "Create and manage your visual assets";
+      if (role === 'marketer') return "Track performance and schedule campaigns";
+      return "Welcome back";
+  };
+
+  // --- MARKETER VIEW ---
+  if (isMarketer) {
+    return (
+      <Box className="py-8">
+        <Container size="xl">
+          <Box mb="xl">
+            <Group align="center" mb="xs">
+                <Title order={2}>{getGreeting()}</Title>
+                <Badge color="cyan" variant="light">Marketer</Badge>
+            </Group>
+            <Text c="dimmed" size="sm">{getSubtitle()}</Text>
+          </Box>
+
+          <SimpleGrid cols={3} spacing="lg" mb="xl">
+             <MetricsCard title="Active Campaigns" value="4" change={12} trend="up" />
+             <MetricsCard title="Total Reach" value="12.5k" change={5.4} trend="up" />
+             <MetricsCard title="Engagement Rate" value="4.2%" change={-1.1} trend="down" />
+          </SimpleGrid>
+          <EngagementChart />
+        </Container>
+      </Box>
+    );
+  }
+
+  // --- DESIGNER / OPERATOR VIEW ---
   const templates = [{
     id: 't1',
     title: 'Instagram Story',
@@ -67,28 +123,27 @@ const DashboardContent: React.FC = () => {
     category: 'Document'
   }];
 
-  return <Box className="py-8">
+  return (
+    <Box className="py-8">
       <Container size="xl">
         <Box mb="xl">
-          <Title order={2} mb="xs">
-            Start creating
-          </Title>
+          <Group align="center" mb="xs">
+            <Title order={2}>{getGreeting()}</Title>
+            {role === 'operator' && <Badge color="blue" variant="light">Operator</Badge>}
+            {role === 'designer' && <Badge color="pink" variant="light">Designer</Badge>}
+          </Group>
           <Text c="dimmed" size="sm" mb="lg">
-            Choose a format for your marketing campaign
+            {getSubtitle()}
           </Text>
-          {/* Updated Grid: Relevant Marketing Sizes Only */}
           <SimpleGrid 
             cols={{ base: 1, sm: 2, md: 4 }} 
             spacing="md"
           >
-            {/* Custom Size (Default) */}
             <CreateNewCard 
                 icon={<LayoutIcon size={24} />} 
                 title="Custom Size" 
                 description="Start from scratch" 
             />
-
-            {/* Instagram Post (1080x1080) */}
             <CreateNewCard 
                 icon={<InstagramIcon size={24} />} 
                 title="Instagram Post" 
@@ -96,8 +151,6 @@ const DashboardContent: React.FC = () => {
                 width={1080} 
                 height={1080} 
             />
-
-            {/* Facebook Post (1200x630) */}
             <CreateNewCard 
                 icon={<FacebookIcon size={24} />} 
                 title="Facebook Post" 
@@ -105,8 +158,6 @@ const DashboardContent: React.FC = () => {
                 width={1200} 
                 height={630} 
             />
-
-            {/* Email Header (600x200) */}
             <CreateNewCard 
                 icon={<MailIcon size={24} />} 
                 title="Email Header" 
@@ -171,7 +222,8 @@ const DashboardContent: React.FC = () => {
           </Tabs.Panel>
         </Tabs>
       </Container>
-    </Box>;
+    </Box>
+  );
 };
 
 export default DashboardContent;

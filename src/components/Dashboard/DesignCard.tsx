@@ -1,9 +1,10 @@
 import React from 'react';
 import { Paper, Text, Group, ActionIcon, Menu, Image, Box, UnstyledButton, Badge, LoadingOverlay } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { MoreVerticalIcon, TrashIcon, CopyIcon, DownloadIcon, PlusCircleIcon } from 'lucide-react'; // Added PlusCircleIcon
+import { MoreVerticalIcon, TrashIcon, CopyIcon, DownloadIcon, PlusCircleIcon } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
+import { useUserRole } from '../../auth/UserContext';
 
 interface DesignCardProps {
   design: {
@@ -42,18 +43,31 @@ const DesignCard: React.FC<DesignCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { role, isSuperAdmin } = useUserRole();
   const [loading, setLoading] = React.useState(false);
+
+  // Role Checks
+  const canManageTemplates = isSuperAdmin || role === 'operator';
+  const canAddToCampaign = isSuperAdmin || role === 'operator' || role === 'marketer';
+
+  // If it's a template, restrict interactions for non-operators
+  const isInteractable = !isTemplate || canManageTemplates;
 
   const handleClick = () => {
     if (isTemplate) {
-      // Template logic
+      // Templates typically open a preview or "Use this template" modal
+      // For now, no action on click unless we add a preview feature
     } else {
       navigate(`/editor/${design.id}`);
     }
   };
 
   const handleDuplicate = async () => {
-    if (!user || isTemplate) return;
+    if (!user) return;
+    // Prevent designers from duplicating templates directly if that's a requirement,
+    // but usually they SHOULD be able to duplicate a template to start a new project.
+    // For now, we allow duplication for everyone who can see the card.
+    
     setLoading(true);
     try {
       const { data: original } = await supabase
@@ -68,9 +82,11 @@ const DesignCard: React.FC<DesignCardProps> = ({
         
         const { error } = await supabase.from('projects').insert({
             user_id: user.id,
+            // If duplicating a template, the new copy is NOT a template
             title: `${originalData.title} (Copy)`,
             canvas_data: originalData.canvas_data,
-            thumbnail_url: originalData.thumbnail_url
+            thumbnail_url: originalData.thumbnail_url,
+            // Ensure new project inherits organization if needed (not implemented here)
         });
         
         if (error) throw error;
@@ -85,7 +101,12 @@ const DesignCard: React.FC<DesignCardProps> = ({
   };
 
   const handleDelete = async () => {
-    if (isTemplate) return;
+    // Strict check for template deletion
+    if (isTemplate && !canManageTemplates) {
+        alert("Only Operators or Admins can delete templates.");
+        return;
+    }
+
     if (!confirm('Are you sure you want to delete this project?')) return;
     
     setLoading(true);
@@ -122,7 +143,6 @@ const DesignCard: React.FC<DesignCardProps> = ({
     }
   };
 
-  // NEW: Function to add design to campaign
   const handleAddToCampaign = () => {
     navigate('/campaign-manager/new', { 
       state: { 
@@ -134,7 +154,8 @@ const DesignCard: React.FC<DesignCardProps> = ({
     });
   };
 
-  return <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" withBorder pos="relative">
+  return (
+    <Paper shadow="sm" className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" withBorder pos="relative">
       <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
       <UnstyledButton onClick={handleClick} className="w-full">
         <Box className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -144,9 +165,11 @@ const DesignCard: React.FC<DesignCardProps> = ({
             fit="cover" 
             className="w-full h-full" 
           />
-          {isTemplate && <Badge className="absolute top-2 right-2" color="purple" variant="filled" size="sm">
+          {isTemplate && (
+            <Badge className="absolute top-2 right-2" color="purple" variant="filled" size="sm">
               Template
-            </Badge>}
+            </Badge>
+          )}
         </Box>
       </UnstyledButton>
       <Box p="md">
@@ -169,37 +192,52 @@ const DesignCard: React.FC<DesignCardProps> = ({
             )}
           </Box>
           
-          {!isTemplate && (
-            <Menu shadow="md" width={200} position="bottom-end">
-                <Menu.Target>
-                <ActionIcon variant="subtle" onClick={e => e.stopPropagation()}>
+          {/* Menu Actions */}
+          <Menu shadow="md" width={200} position="bottom-end">
+            <Menu.Target>
+                {/* Hide menu trigger if it's a template and user lacks permission */}
+                <ActionIcon 
+                    variant="subtle" 
+                    onClick={e => e.stopPropagation()}
+                    disabled={isTemplate && !canManageTemplates && !canAddToCampaign}
+                    style={{ opacity: (isTemplate && !canManageTemplates && !canAddToCampaign) ? 0 : 1 }}
+                >
                     <MoreVerticalIcon size={16} />
                 </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                {/* NEW: Add to Campaign Item */}
-                <Menu.Item leftSection={<PlusCircleIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleAddToCampaign(); }}>
-                    Add to Campaign
-                </Menu.Item>
+            </Menu.Target>
+            <Menu.Dropdown>
+                {/* Can Add to Campaign? */}
+                {canAddToCampaign && (
+                    <Menu.Item leftSection={<PlusCircleIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleAddToCampaign(); }}>
+                        Add to Campaign
+                    </Menu.Item>
+                )}
                 
                 <Menu.Divider />
 
                 <Menu.Item leftSection={<CopyIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}>
                     Duplicate
                 </Menu.Item>
+                
                 <Menu.Item leftSection={<DownloadIcon size={14} />} onClick={(e) => { e.stopPropagation(); handleDownload(); }}>
                     Download
                 </Menu.Item>
-                <Menu.Divider />
-                <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>
-                    Delete
-                </Menu.Item>
-                </Menu.Dropdown>
-            </Menu>
-          )}
+                
+                {/* Only show Delete if it's NOT a template, OR if user is Operator/Admin */}
+                {isInteractable && (
+                    <>
+                        <Menu.Divider />
+                        <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>
+                            Delete
+                        </Menu.Item>
+                    </>
+                )}
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Box>
-    </Paper>;
+    </Paper>
+  );
 };
 
 export default DesignCard;
