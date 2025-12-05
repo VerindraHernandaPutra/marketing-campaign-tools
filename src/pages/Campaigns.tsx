@@ -1,9 +1,9 @@
-// [cite: src/pages/Projects.tsx]
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// [cite: src/pages/Campaigns.tsx]
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  MantineProvider, Flex, Container, Title, Box, Group, Button, TextInput, 
-  Select, SegmentedControl, SimpleGrid, Center, Loader, Text, Tooltip,
-  Paper, Table, Avatar, Badge, ActionIcon, ScrollArea, Chip, Modal, Stack
+  MantineProvider, Flex, Container, Title, Box, TextInput, 
+  SimpleGrid, Button, Group, Loader, Text, Center, ScrollArea, Chip,
+  SegmentedControl, Tooltip, Modal, Stack, Paper, Table, Avatar, Badge, ActionIcon
 } from '@mantine/core';
 import { useColorScheme } from '@mantine/hooks';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
@@ -12,113 +12,90 @@ import DesignCard from '../components/Dashboard/DesignCard';
 import CreateNewCard from '../components/Dashboard/CreateNewCard';
 import ConfirmationModal from '../components/Layout/ConfirmationModal';
 import { 
-  PlusIcon, SearchIcon, GridIcon, ListIcon, FilterIcon, 
-  TrashIcon, EditIcon, LayoutTemplateIcon, FileTextIcon,
-  LayoutIcon, InstagramIcon, FacebookIcon, MailIcon
+  SearchIcon, PlusIcon, FilterIcon, GridIcon, ListIcon, 
+  LayoutTemplateIcon, FileTextIcon, TrashIcon, EditIcon, 
+  FacebookIcon, InstagramIcon, MailIcon, LayoutIcon 
 } from 'lucide-react';
-import '@mantine/core/styles.css';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../auth/useAuth';
 import { useUserRole } from '../auth/UserContext';
+import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
+import '@mantine/core/styles.css';
 
-export type Project = {
+// Reuse Project Type
+interface Project {
   id: string;
-  user_id: string;
   title: string;
-  canvas_data: { width?: number; height?: number; [key: string]: unknown };
   thumbnail_url: string | null;
-  created_at: string | null;
   updated_at: string | null;
+  canvas_data: { width?: number; height?: number; [key: string]: unknown };
+  is_template: boolean;
+  organization_id: string;
   tags?: string[] | null;
-  is_template?: boolean;
-};
+}
 
-const PROJECT_TAGS = ['All', 'Campaign', 'Template', 'Draft']; 
+const CAMPAIGN_TAGS = ['All', 'Social Media', 'Instagram', 'Facebook', 'Email', 'Business', 'Custom'];
 
-const Projects: React.FC = () => {
+const Campaigns: React.FC = () => {
   const { user } = useAuth();
-  const { role, isSuperAdmin, currentOrgId } = useUserRole();
+  const { role, currentOrgId, isSuperAdmin } = useUserRole();
   const navigate = useNavigate();
   
   const preferredColorScheme = useColorScheme();
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
 
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<string | null>('recent');
-  const [selectedTag, setSelectedTag] = useState<string>('All');
-  
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [campaigns, setCampaigns] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string>('All');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Modals
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Modal States
+  const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
   const [creationPreset, setCreationPreset] = useState<{width?: number, height?: number, title: string, tags: string[]} | null>(null);
   const [isCreationLoading, setIsCreationLoading] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
+  // Operator Permission Check
   const isOperator = isSuperAdmin || role === 'operator';
+  // Marketers can also view/create campaigns typically
+  const canManageCampaigns = isOperator || role === 'marketer';
 
-  const fetchProjects = useCallback(async () => {
-    if (!user) return;
+  const fetchCampaigns = useCallback(async () => {
+    if (!currentOrgId) return;
     setLoading(true);
-    
-    // Fetch all projects for this user/org
+
+    // Fetch projects that are NOT templates (is_template = false)
     let query = supabase
       .from('projects')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('organization_id', currentOrgId)
+      .eq('is_template', false) 
       .order('updated_at', { ascending: false });
 
-    // Server-side search if simple
-    if (searchQuery.length > 3) {
-       query = query.ilike('title', `%${searchQuery}%`);
+    if (searchQuery) {
+      query = query.ilike('title', `%${searchQuery}%`);
+    }
+
+    if (selectedTag !== 'All') {
+      query = query.contains('tags', [selectedTag]);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching projects:', error);
-    } else if (data) {
-      setProjects(data as Project[]);
+      console.error('Error fetching campaign designs:', error);
+    } else {
+      setCampaigns(data as Project[]);
     }
     setLoading(false);
-  }, [user, searchQuery]);
+  }, [currentOrgId, searchQuery, selectedTag]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
-
-  const filteredProjects = useMemo(() => {
-    let result = [...projects];
-
-    // 1. Tag Filtering (Client-side mostly for simple tags)
-    if (selectedTag === 'Campaign') {
-        result = result.filter(p => p.is_template === false);
-    } else if (selectedTag === 'Template') {
-        result = result.filter(p => p.is_template === true);
-    }
-
-    // 2. Search Filter (if not done server side)
-    if (searchQuery.trim() && searchQuery.length <= 3) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(p => p.title?.toLowerCase().includes(query));
-    }
-
-    // 3. Sort Logic
-    if (sortBy === 'name') {
-      result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-    } else if (sortBy === 'created') {
-      result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    } else {
-      result.sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
-    }
-
-    return result;
-  }, [projects, searchQuery, sortBy, selectedTag]);
+    fetchCampaigns();
+  }, [fetchCampaigns]);
 
   // --- Creation Logic ---
   const handleCreateProject = async (
@@ -128,52 +105,55 @@ const Projects: React.FC = () => {
     tags: string[], 
     isTemplate: boolean
   ) => {
-    if (!user) return;
+    if (!user || !currentOrgId) return;
     setIsCreationLoading(true);
     
     const finalWidth = width || 850;
     const finalHeight = height || 500;
+    const finalTags = tags;
 
     try {
       const { data, error } = await supabase
         .from('projects')
-        .insert({ 
-            title: title, 
-            user_id: user.id,
-            organization_id: currentOrgId || undefined,
-            is_template: isTemplate,
-            tags: tags,
-            canvas_data: {
-                version: "5.3.0",
-                width: finalWidth,
-                height: finalHeight,
-                backgroundColor: '#ffffff',
-                objects: []
-            } 
+        .insert({
+          title: title,
+          user_id: user.id,
+          organization_id: currentOrgId,
+          is_template: isTemplate,
+          tags: finalTags,
+          canvas_data: {
+            version: "5.3.0",
+            width: finalWidth,
+            height: finalHeight,
+            backgroundColor: '#ffffff',
+            objects: []
+          }
         })
-        .select('id') 
+        .select()
         .single();
 
       if (error) throw error;
       if (data) {
-        setIsCreateModalOpen(false);
+        setIsDesignModalOpen(false);
         setCreationPreset(null);
         navigate(`/editor/${data.id}`);
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      alert("Error creating project: " + message);
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      alert("Error creating design: " + message);
     } finally {
       setIsCreationLoading(false);
     }
   };
 
   const handleSizeCardClick = (width?: number, height?: number, title?: string, autoTags: string[] = []) => {
-      const finalTitle = title || 'Untitled Project';
+      const finalTitle = title || 'Untitled Design';
       
       if (isOperator) {
+          // Allow operators to choose categorization
           setCreationPreset({ width, height, title: finalTitle, tags: autoTags });
       } else {
+          // Standard creation for others (non-template)
           handleCreateProject(width, height, finalTitle, autoTags, false);
       }
   };
@@ -188,41 +168,43 @@ const Projects: React.FC = () => {
       if (!projectToDelete) return;
       const { error } = await supabase.from('projects').delete().eq('id', projectToDelete);
       if (!error) {
-          fetchProjects();
+          fetchCampaigns();
           setDeleteModalOpen(false);
           setProjectToDelete(null);
       } else {
-          alert('Error deleting: ' + error.message);
+          alert('Error deleting design: ' + error.message);
       }
   };
 
-  const handleDuplicate = async (project: Project, asTemplate: boolean) => {
-    if (!user) return;
+  const handleDuplicate = async (project: Project) => {
+    if (!user || !currentOrgId) return;
     if(!confirm(`Duplicate "${project.title}"?`)) return;
 
     try {
-        const { data: newProject, error } = await supabase.from('projects').insert({
-            user_id: user.id,
-            organization_id: currentOrgId,
-            is_template: asTemplate, 
-            title: `${project.title} (Copy)`,
-            canvas_data: project.canvas_data,
-            thumbnail_url: project.thumbnail_url,
-            tags: project.tags 
-        }).select('id').single();
-        
-        if (error) throw error;
-        if (newProject) navigate(`/editor/${newProject.id}`);
+      const { data: newProject, error } = await supabase.from('projects').insert({
+          user_id: user.id,
+          organization_id: currentOrgId,
+          is_template: false, // Creating instance
+          title: `${project.title} (Copy)`,
+          canvas_data: project.canvas_data,
+          thumbnail_url: project.thumbnail_url,
+          tags: project.tags 
+      }).select('id').single();
+      
+      if (error) throw error;
+      if (newProject) {
+          navigate(`/editor/${newProject.id}`);
+      }
     } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : "Unknown error";
-        alert("Error duplicating: " + msg);
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      alert("Error duplicating: " + msg);
     }
   };
 
   // --- Sub-components ---
   const CreationOptions = () => (
     <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-      <CreateNewCard icon={<LayoutIcon size={24} />} title="Custom Size" description="Start from scratch" onClick={() => handleSizeCardClick(undefined, undefined, 'Custom Size', ['Custom'])} />
+      <CreateNewCard icon={<LayoutIcon size={24} />} title="Custom Size" description="Start from scratch" onClick={() => handleSizeCardClick(undefined, undefined, 'Custom Design', ['Custom'])} />
       <CreateNewCard icon={<InstagramIcon size={24} />} title="Instagram Post" description="1080 x 1080 px" width={1080} height={1080} onClick={() => handleSizeCardClick(1080, 1080, 'Instagram Post', ['Social Media', 'Instagram'])} />
       <CreateNewCard icon={<FacebookIcon size={24} />} title="Facebook Post" description="1200 x 630 px" width={1200} height={630} onClick={() => handleSizeCardClick(1200, 630, 'Facebook Post', ['Social Media', 'Facebook'])} />
       <CreateNewCard icon={<MailIcon size={24} />} title="Email Header" description="600 x 200 px" width={600} height={200} onClick={() => handleSizeCardClick(600, 200, 'Email Header', ['Email', 'Marketing'])} />
@@ -238,8 +220,8 @@ const Projects: React.FC = () => {
             opened={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
             onConfirm={handleConfirmDelete}
-            title="Delete Project?"
-            message="Are you sure you want to delete this project? This action cannot be undone."
+            title="Delete Design?"
+            message="Are you sure you want to delete this design? This action cannot be undone."
             confirmLabel="Delete Forever"
             isDanger
         />
@@ -249,10 +231,15 @@ const Projects: React.FC = () => {
           <Box className="flex-1 p-8">
             <Container size="xl">
               <Group justify="space-between" mb="md">
-                <Group gap="xs">
-                    <Title order={2}>All Projects</Title>
-                    <Badge variant="light" color="blue" size="lg" circle>{projects.length}</Badge>
-                </Group>
+                <div>
+                  <Group gap="xs">
+                    <Title order={2}>Campaign Designs</Title>
+                    <Badge variant="light" color="purple" size="lg" circle>{campaigns.length}</Badge>
+                  </Group>
+                  <Text c="dimmed">
+                    Manage visual assets for your marketing campaigns
+                  </Text>
+                </div>
                 
                 <Group>
                     <SegmentedControl 
@@ -263,82 +250,70 @@ const Projects: React.FC = () => {
                             { label: <Tooltip label="List View"><ListIcon size={16}/></Tooltip>, value: 'list' },
                         ]}
                     />
-                    <Button leftSection={<PlusIcon size={16} />} color="blue" onClick={() => setIsCreateModalOpen(true)}>
-                    New Project
+                    {canManageCampaigns && (
+                    <Button 
+                        leftSection={<PlusIcon size={16} />} 
+                        onClick={() => setIsDesignModalOpen(true)}
+                        color="blue"
+                    >
+                        New Design
                     </Button>
+                    )}
                 </Group>
               </Group>
 
               <Group justify="space-between" mb="lg">
-                <TextInput 
-                  placeholder="Search projects..." 
-                  leftSection={<SearchIcon size={16} />} 
-                  value={searchQuery} 
-                  onChange={e => setSearchQuery(e.currentTarget.value)} 
-                  w={300} 
+                 <TextInput 
+                    placeholder="Search designs..." 
+                    leftSection={<SearchIcon size={16} />} 
+                    value={searchQuery} 
+                    onChange={e => setSearchQuery(e.currentTarget.value)} 
+                    w={300} 
                 />
                 
                 <ScrollArea type="never" w={{ base: '100%', md: 'auto' }}>
                     <Group gap="sm" wrap="nowrap">
                         <FilterIcon size={16} className="text-gray-400" />
-                        {PROJECT_TAGS.map(tag => (
+                        {CAMPAIGN_TAGS.map(tag => (
                             <Chip key={tag} checked={selectedTag === tag} onChange={() => setSelectedTag(tag)} variant="light" color="blue" size="sm">
                                 {tag}
                             </Chip>
                         ))}
                     </Group>
                 </ScrollArea>
-
-                <Select 
-                    value={sortBy} 
-                    onChange={setSortBy} 
-                    data={[
-                      { value: 'recent', label: 'Recently edited' },
-                      { value: 'name', label: 'Name (A-Z)' },
-                      { value: 'created', label: 'Date created' }
-                    ]} 
-                    w={180} 
-                />
               </Group>
 
               {loading ? (
-                <Center mt="xl" h={200}>
-                  <Loader color="blue" />
-                </Center>
+                <Center h={200}><Loader /></Center>
               ) : (
                 <>
-                  {filteredProjects.length === 0 ? (
-                      <Center mt="xl" h={200}>
-                          <Text c="dimmed">No projects found matching your search.</Text>
-                      </Center>
+                  {campaigns.length === 0 ? (
+                    <Text c="dimmed" ta="center" mt="xl">No campaign designs found.</Text>
                   ) : (
-                      viewMode === 'grid' ? (
-                        <SimpleGrid 
-                            cols={{ base: 1, sm: 2, md: 3, lg: 4 }} 
-                            spacing="lg"
-                        >
-                            {filteredProjects.map(project => (
+                    viewMode === 'grid' ? (
+                        <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
+                        {campaigns.map(design => (
                             <DesignCard 
-                                key={project.id} 
-                                design={{
-                                    id: project.id,
-                                    title: project.title,
-                                    thumbnail: project.thumbnail_url || '', 
-                                    updated_at: project.updated_at,
-                                    canvas_data: project.canvas_data,
-                                    tags: project.tags
-                                }}
-                                isTemplate={project.is_template}
-                                onRefresh={fetchProjects} 
+                            key={design.id} 
+                            design={{
+                                id: design.id,
+                                title: design.title,
+                                thumbnail: design.thumbnail_url || '',
+                                updated_at: design.updated_at,
+                                canvas_data: design.canvas_data,
+                                tags: design.tags
+                            }}
+                            isTemplate={false} 
+                            onRefresh={fetchCampaigns}
                             />
-                            ))}
+                        ))}
                         </SimpleGrid>
-                      ) : (
+                    ) : (
                         <Paper shadow="sm" withBorder>
                             <Table striped highlightOnHover verticalSpacing="sm">
                                 <Table.Thead>
                                     <Table.Tr>
-                                        <Table.Th>Name</Table.Th>
+                                        <Table.Th>Design Name</Table.Th>
                                         <Table.Th>Tags</Table.Th>
                                         <Table.Th>Dimensions</Table.Th>
                                         <Table.Th>Last Updated</Table.Th>
@@ -346,7 +321,7 @@ const Projects: React.FC = () => {
                                     </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {filteredProjects.map(t => (
+                                    {campaigns.map(t => (
                                         <Table.Tr key={t.id}>
                                             <Table.Td>
                                                 <Group gap="sm">
@@ -375,16 +350,20 @@ const Projects: React.FC = () => {
                                                             <EditIcon size={16} />
                                                         </ActionIcon>
                                                     </Tooltip>
+                                                    
                                                     <Tooltip label="Duplicate">
-                                                        <ActionIcon variant="light" color="green" onClick={() => handleDuplicate(t, false)}>
+                                                        <ActionIcon variant="light" color="green" onClick={() => handleDuplicate(t)}>
                                                             <LayoutTemplateIcon size={16} />
                                                         </ActionIcon>
                                                     </Tooltip>
-                                                    <Tooltip label="Delete">
-                                                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteClick(t.id)}>
-                                                            <TrashIcon size={16} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
+                                                    
+                                                    {canManageCampaigns && (
+                                                        <Tooltip label="Delete">
+                                                            <ActionIcon variant="light" color="red" onClick={() => handleDeleteClick(t.id)}>
+                                                                <TrashIcon size={16} />
+                                                            </ActionIcon>
+                                                        </Tooltip>
+                                                    )}
                                                 </Group>
                                             </Table.Td>
                                         </Table.Tr>
@@ -392,7 +371,7 @@ const Projects: React.FC = () => {
                                 </Table.Tbody>
                             </Table>
                         </Paper>
-                      )
+                    )
                   )}
                 </>
               )}
@@ -400,19 +379,19 @@ const Projects: React.FC = () => {
           </Box>
         </Flex>
 
-        {/* Create Project Modal (Size Selection) */}
-        <Modal opened={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Project" size="xl">
+        {/* Create Campaign Design Modal */}
+        <Modal opened={isDesignModalOpen} onClose={() => setIsDesignModalOpen(false)} title="Create New Campaign Design" size="xl">
             <Box mb="lg">
-                <Text c="dimmed" size="sm">Select a canvas size to start.</Text>
+                <Text c="dimmed" size="sm">Select a size to start designing.</Text>
             </Box>
             <CreationOptions />
         </Modal>
 
-        {/* Operator Choice Modal (Triggered by Size Selection if Operator) */}
+        {/* Operator Choice Modal (Only if triggered by Operator via Size Card) */}
         <Modal opened={!!creationPreset} onClose={() => setCreationPreset(null)} title="Categorize Design" size="md" centered>
             <Text size="sm" c="dimmed" mb="xl">How would you like to create this?</Text>
             <Stack gap="md">
-                <Button size="lg" variant="light" color="blue" fullWidth h="auto" py="md" justify="flex-start" leftSection={<LayoutTemplateIcon size={24} />} onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title, creationPreset.tags, true)} loading={isCreationLoading}>
+                <Button size="lg" variant="light" color="blue" fullWidth h="auto" py="md" justify="flex-start" leftSection={<LayoutTemplateIcon size={24} />} onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title + ' Template', creationPreset.tags, true)} loading={isCreationLoading}>
                     <div className="flex flex-col items-start">
                         <Text size="sm" fw={600}>Create as Template</Text>
                         <Text size="xs" c="dimmed" fw={400} style={{ opacity: 0.8 }}>Visible to Designers</Text>
@@ -432,4 +411,4 @@ const Projects: React.FC = () => {
   );
 };
 
-export default Projects;
+export default Campaigns;

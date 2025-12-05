@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppShell } from '@mantine/core'; 
 import Header from './Layout/Header';
 import Sidebar from './Layout/Sidebar';
@@ -12,7 +12,7 @@ import { Canvas, Object as FabricObject, Point } from 'fabric';
 import { jsPDF } from 'jspdf'; 
 
 import { CanvasContext, CanvasContextType } from '../context/CanvasContext';
-import { useNotification } from '../context/NotificationContext'; // Import hook
+import { useNotification } from '../context/NotificationContext';
 
 type LoadedCanvasData = {
   width?: number;
@@ -36,8 +36,153 @@ const CanvaEditor: React.FC = () => {
   const [projectData, setProjectData] = useState<string | null>(null);
   const mainAreaRef = useRef<HTMLDivElement>(null);
   
-  const notify = useNotification(); // Initialize hook
+  const notify = useNotification();
 
+  // --- Optimized History State ---
+  // We use Refs for heavy history arrays to avoid re-rendering the component 
+  // every time a state is pushed (which was causing the lag).
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  
+  // We still need state for buttons to know if they should be enabled/disabled
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Lock to prevent recording history during undo/redo operations
+  const isLocked = useRef(false);
+
+  // --- 1. Save State Logic ---
+  const saveState = useCallback(() => {
+    if (!canvas || isLocked.current) return;
+
+    // Clear redo stack on new action
+    redoStack.current = [];
+    setCanRedo(false);
+
+    try {
+      const json = JSON.stringify(canvas.toJSON());
+      undoStack.current.push(json);
+      
+      // Limit stack size (e.g., 50)
+      if (undoStack.current.length > 50) {
+        undoStack.current.shift();
+      }
+      
+      setCanUndo(true);
+    } catch (error) {
+      console.error("Failed to save state:", error);
+    }
+  }, [canvas]);
+
+  // --- 2. Initialize Listeners ---
+  useEffect(() => {
+    if (!canvas) return;
+
+    // Save initial state
+    const initialState = JSON.stringify(canvas.toJSON());
+    undoStack.current = [initialState];
+    setCanUndo(true);
+
+    const handleModification = () => {
+        saveState();
+    };
+
+    // Fabric.js events
+    canvas.on('object:added', handleModification);
+    canvas.on('object:modified', handleModification);
+    canvas.on('object:removed', handleModification);
+
+    return () => {
+      canvas.off('object:added', handleModification);
+      canvas.off('object:modified', handleModification);
+      canvas.off('object:removed', handleModification);
+    };
+  }, [canvas, saveState]);
+
+  // --- 3. Undo Action ---
+  const handleUndo = useCallback(async () => {
+    if (!canvas || undoStack.current.length <= 1) return;
+
+    // Lock history recording
+    isLocked.current = true;
+
+    // Get current state and push to redo
+    const currentState = undoStack.current.pop();
+    if (currentState) {
+      redoStack.current.push(currentState);
+      setCanRedo(true);
+    }
+
+    // Get previous state to load
+    const prevState = undoStack.current[undoStack.current.length - 1];
+
+    if (prevState) {
+      try {
+        await canvas.loadFromJSON(JSON.parse(prevState));
+        // Re-apply background logic if needed
+        if (!canvas.backgroundColor || canvas.backgroundColor === 'transparent') {
+            canvas.backgroundColor = '#ffffff';
+        }
+        canvas.renderAll();
+      } catch (error) {
+        console.error("Undo error:", error);
+      }
+    }
+
+    // Update button state
+    setCanUndo(undoStack.current.length > 1);
+    
+    // Unlock
+    isLocked.current = false;
+  }, [canvas]);
+
+  // --- 4. Redo Action ---
+  const handleRedo = useCallback(async () => {
+    if (!canvas || redoStack.current.length === 0) return;
+
+    isLocked.current = true;
+
+    const nextState = redoStack.current.pop();
+    
+    if (nextState) {
+      undoStack.current.push(nextState);
+      setCanUndo(true);
+
+      try {
+        await canvas.loadFromJSON(JSON.parse(nextState));
+        if (!canvas.backgroundColor || canvas.backgroundColor === 'transparent') {
+            canvas.backgroundColor = '#ffffff';
+        }
+        canvas.renderAll();
+      } catch (error) {
+        console.error("Redo error:", error);
+      }
+    }
+
+    setCanRedo(redoStack.current.length > 0);
+    isLocked.current = false;
+  }, [canvas]);
+
+  // --- Keyboard Shortcuts ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const activeTag = document.activeElement?.tagName.toLowerCase();
+        if (activeTag === 'input' || activeTag === 'textarea') return;
+
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            handleUndo();
+        }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+            e.preventDefault();
+            handleRedo();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+
+  // --- Existing Data Fetching Logic ---
   useEffect(() => {
     if (!projectId) return;
     const fetchProject = async () => {
@@ -62,71 +207,44 @@ const CanvaEditor: React.FC = () => {
       }
     };
     fetchProject();
-  }, [projectId, notify]); // Added notify to dependency array
+  }, [projectId, notify]);
 
+  // --- Save / Download / Resize Handlers (Kept same) ---
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
     
-    // Temporarily reset viewport for clean thumbnail
     const originalViewport = canvas.viewportTransform;
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 0.8,
-      multiplier: 0.5 
-    });
+    const dataURL = canvas.toDataURL({ format: 'png', quality: 0.8, multiplier: 0.5 });
 
-    if (originalViewport) {
-        canvas.setViewportTransform(originalViewport);
-    }
+    if (originalViewport) canvas.setViewportTransform(originalViewport);
 
     const baseJson = canvas.toJSON();
-    const canvasJson = {
-        ...baseJson,
-        width: dimensions.width,
-        height: dimensions.height,
-        backgroundColor: '#ffffff'
-    };
+    const canvasJson = { ...baseJson, width: dimensions.width, height: dimensions.height, backgroundColor: '#ffffff' };
 
-    console.log('Saving project...', canvasJson);
-    
-    const { error } = await supabase
-      .from('projects')
-      .update({ 
-        canvas_data: canvasJson,
-        thumbnail_url: dataURL,
-        updated_at: new Date().toISOString()
-      }) 
-      .eq('id', projectId);
+    const { error } = await supabase.from('projects').update({ 
+        canvas_data: canvasJson, 
+        thumbnail_url: dataURL, 
+        updated_at: new Date().toISOString() 
+    }).eq('id', projectId);
 
-    if (error) {
-      notify.error('Save Failed', error.message);
-    } else {
-      notify.success('Project Saved', 'Your design has been saved successfully.');
-    }
+    if (error) notify.error('Save Failed', error.message);
+    else notify.success('Project Saved', 'Your design has been saved successfully.');
   };
 
   const handleDownload = (format: 'png' | 'jpeg' | 'pdf', quality: number, multiplier: number) => {
       if (!canvas) return;
-
       canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
       if (format === 'pdf') {
-          const imgData = canvas.toDataURL({
-              format: 'png',
-              multiplier: multiplier,
-          });
+          const imgData = canvas.toDataURL({ format: 'png', multiplier });
           const orientation = dimensions.width > dimensions.height ? 'l' : 'p';
           const pdf = new jsPDF(orientation, 'px', [dimensions.width, dimensions.height]);
           pdf.addImage(imgData, 'PNG', 0, 0, dimensions.width, dimensions.height);
           pdf.save(`${projectTitle}.pdf`);
       } else {
-          const dataURL = canvas.toDataURL({
-              format: format,
-              quality: quality,
-              multiplier: multiplier,
-          });
+          const dataURL = canvas.toDataURL({ format, quality, multiplier });
           const link = document.createElement('a');
           link.href = dataURL;
           link.download = `${projectTitle}.${format}`;
@@ -139,38 +257,24 @@ const CanvaEditor: React.FC = () => {
 
   const handleUpdateTitle = async (newTitle: string) => {
     if (!projectId) return;
-
-    const { error } = await supabase
-      .from('projects')
-      .update({ title: newTitle })
-      .eq('id', projectId);
-
-    if (error) {
-      notify.error('Update Failed', 'Could not rename project: ' + error.message);
-    } else {
-      setProjectTitle(newTitle);
-      // Optional: notify.success('Renamed', 'Project title updated.');
-    }
+    const { error } = await supabase.from('projects').update({ title: newTitle }).eq('id', projectId);
+    if (error) notify.error('Update Failed', 'Could not rename project: ' + error.message);
+    else setProjectTitle(newTitle);
   };
 
   const handleResize = (newDimensions: { width: number; height: number }) => {
     setDimensions(newDimensions);
     setIsResizeModalOpen(false);
+    if (canvas) saveState(); // Save state on resize
     notify.show('Canvas Resized', `${newDimensions.width} x ${newDimensions.height} px`, 'info');
   };
 
-  // Zoom logic remains the same
+  // Zoom Helpers
   const handleZoomIn = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
-    let newZoom = currentZoom * 1.2;
-    if (newZoom > 20) newZoom = 20; 
-    
-    const center = new Point(
-      mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
-      mainAreaRef.current ? mainAreaRef.current.clientHeight / 2 : canvas.getHeight() / 2
-    );
-
+    const newZoom = Math.min(currentZoom * 1.2, 20);
+    const center = new Point(canvas.getWidth() / 2, canvas.getHeight() / 2);
     canvas.zoomToPoint(center, newZoom);
     canvas.renderAll();
   };
@@ -178,32 +282,26 @@ const CanvaEditor: React.FC = () => {
   const handleZoomOut = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
-    let newZoom = currentZoom / 1.2;
-    if (newZoom < 0.1) newZoom = 0.1; 
-    
-    const center = new Point(
-      mainAreaRef.current ? mainAreaRef.current.clientWidth / 2 : canvas.getWidth() / 2, 
-      mainAreaRef.current ? mainAreaRef.current.clientHeight / 2 : canvas.getHeight() / 2
-    );
-
+    const newZoom = Math.max(currentZoom / 1.2, 0.1);
+    const center = new Point(canvas.getWidth() / 2, canvas.getHeight() / 2);
     canvas.zoomToPoint(center, newZoom);
     canvas.renderAll();
   };
 
   const handleFitToCanvas = () => {
     if (!canvas || !mainAreaRef.current) return;
-
     const containerWidth = mainAreaRef.current.clientWidth;
     const containerHeight = mainAreaRef.current.clientHeight;
-    const designWidth = dimensions.width;
-    const designHeight = dimensions.height;
     
-    const newZoom = 1.0; 
-
+    // Reset transform to calculate zoom correctly
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    
+    const scaleX = (containerWidth - 80) / dimensions.width; // 80px padding
+    const scaleY = (containerHeight - 80) / dimensions.height;
+    const newZoom = Math.min(scaleX, scaleY, 1); // Don't zoom in past 100% automatically
 
-    const panX = (containerWidth - designWidth * newZoom) / 2;
-    const panY = (containerHeight - designHeight * newZoom) / 2;
+    const panX = (containerWidth - dimensions.width * newZoom) / 2;
+    const panY = (containerHeight - dimensions.height * newZoom) / 2;
 
     canvas.setZoom(newZoom);
     canvas.setViewportTransform([newZoom, 0, 0, newZoom, panX, panY]);
@@ -218,25 +316,10 @@ const CanvaEditor: React.FC = () => {
   return (
     <CanvasContext.Provider value={contextValue}>
       <AppShell 
-        styles={{
-          main: {
-            padding: 0,
-            height: 'calc(100vh - 60px)',
-          }
-        }} 
-        navbar={{
-          width: 300,
-          breakpoint: 'sm',
-          collapsed: { mobile: true, desktop: !sidebarOpened }
-        }} 
-        aside={{
-          width: 300,
-          breakpoint: 'sm',
-          collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedObject }
-        }} 
-        header={{
-          height: 60
-        }}
+        styles={{ main: { padding: 0, height: 'calc(100vh - 60px)' } }} 
+        navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !sidebarOpened } }} 
+        aside={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedObject } }} 
+        header={{ height: 60 }}
       >
         <AppShell.Header>
           <Header 
@@ -252,6 +335,10 @@ const CanvaEditor: React.FC = () => {
             onZoomOut={handleZoomOut}
             onFitToCanvas={handleFitToCanvas}
             onToggleDownloadModal={() => setIsDownloadModalOpen(true)}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo} 
+            canRedo={canRedo} 
           />
         </AppShell.Header>
         
@@ -279,18 +366,8 @@ const CanvaEditor: React.FC = () => {
         </AppShell.Main>
       </AppShell>
       
-      <ResizeModal
-        opened={isResizeModalOpen}
-        onClose={() => setIsResizeModalOpen(false)}
-        onResize={handleResize}
-        currentDimensions={dimensions}
-      />
-
-      <DownloadModal
-        opened={isDownloadModalOpen}
-        onClose={() => setIsDownloadModalOpen(false)}
-        onDownload={handleDownload}
-      />
+      <ResizeModal opened={isResizeModalOpen} onClose={() => setIsResizeModalOpen(false)} onResize={handleResize} currentDimensions={dimensions} />
+      <DownloadModal opened={isDownloadModalOpen} onClose={() => setIsDownloadModalOpen(false)} onDownload={handleDownload} />
     </CanvasContext.Provider>
   );
 };

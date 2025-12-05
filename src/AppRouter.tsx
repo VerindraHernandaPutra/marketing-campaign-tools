@@ -1,3 +1,4 @@
+// [cite: src/AppRouter.tsx]
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { App } from './App';
 import Dashboard from './pages/Dashboard';
@@ -8,11 +9,12 @@ import Analytics from './pages/Analytics';
 import Projects from './pages/Projects';
 import Folders from './pages/Folders';
 import Templates from './pages/Templates';
+import Campaigns from './pages/Campaigns';
 import Clients from './pages/Clients';
 import Groups from './pages/Groups';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
-import OrganizationDetails from './pages/OrganizationDetails'; // New Page
+import OrganizationDetails from './pages/OrganizationDetails'; 
 import { LoginPage } from './pages/LoginPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleGuard } from './components/Auth/RoleGuard';
@@ -40,6 +42,8 @@ export function AppRouter() {
                 <Route path="/clients" element={<Clients />} />
                 {/* Operator managing their own org users */}
                 <Route path="/organization/users" element={<OrganizationDetails />} />
+                {/* Operator can see the specific Campaigns Design Page */}
+                <Route path="/campaigns" element={<Campaigns />} />
             </Route>
 
             {/* DESIGNER & OPERATOR */}
@@ -57,6 +61,8 @@ export function AppRouter() {
                 <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
                 <Route path="/scheduled" element={<ScheduledPosts />} />
                 <Route path="/analytics" element={<Analytics />} />
+                {/* Marketers can also view campaign designs */}
+                <Route path="/campaigns" element={<Campaigns />} />
             </Route>
 
         </Route>

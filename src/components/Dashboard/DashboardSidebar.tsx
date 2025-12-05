@@ -1,7 +1,8 @@
+// [cite: src/components/Dashboard/DashboardSidebar.tsx]
 import React from 'react';
 import { Box, NavLink, ScrollArea, Text, Divider, Loader, Center } from '@mantine/core';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HomeIcon, LayoutIcon, ImageIcon, SendIcon, CalendarIcon, BarChartIcon, UsersIcon, LayersIcon, ShieldIcon } from 'lucide-react';
+import { HomeIcon, LayoutIcon, ImageIcon, SendIcon, CalendarIcon, BarChartIcon, UsersIcon, LayersIcon, ShieldIcon, MegaphoneIcon } from 'lucide-react';
 import { useUserRole } from '../../auth/UserContext';
 
 const DashboardSidebar: React.FC = () => {
@@ -20,7 +21,6 @@ const DashboardSidebar: React.FC = () => {
   }
 
   // --- SUPER ADMIN VIEW ---
-  // Exclusive view: Hides all other menus as requested
   if (isSuperAdmin) {
     return (
       <Box w={240} h="calc(100vh - 70px)" className="border-r border-gray-200 dark:border-gray-700">
@@ -127,6 +127,14 @@ const DashboardSidebar: React.FC = () => {
                 leftSection={<SendIcon size={18} />} 
                 active={location.pathname.startsWith('/campaign-manager')} 
                 onClick={() => navigate('/campaign-manager')} 
+                className="mb-1" 
+              />
+              {/* NEW LINK */}
+              <NavLink 
+                label="Campaign Designs" 
+                leftSection={<MegaphoneIcon size={18} />} 
+                active={location.pathname === '/campaigns'} 
+                onClick={() => navigate('/campaigns')} 
                 className="mb-1" 
               />
               <NavLink 
