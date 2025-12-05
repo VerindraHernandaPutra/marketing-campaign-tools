@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Object as FabricObject } from 'fabric';
-// 1. FIX: Import 'useMantineTheme' to access theme colors
 import { Box, useMantineTheme } from '@mantine/core';
 
 interface CanvasProps {
@@ -19,87 +18,137 @@ const Canvas: React.FC<CanvasProps> = ({
   height,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [localCanvas, setLocalCanvas] = useState<FabricCanvas | null>(null);
-  // 2. FIX: Get the theme object
   const theme = useMantineTheme();
 
-  // Effect to initialize the canvas ONCE
+  // Initialize Canvas
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !containerRef.current) return;
 
+    // Destroy existing canvas if any (safety check)
+    if (localCanvas) {
+      try {
+        localCanvas.dispose();
+      } catch (e) {
+        console.warn('Error disposing canvas', e);
+      }
+    }
+
+    // Initialize Fabric
     const canvas = new FabricCanvas(canvasRef.current, {
       width: width,
       height: height,
-      backgroundColor: 'white', // The canvas itself is always white
-      devicePixelRatio: window.devicePixelRatio,
+      backgroundColor: '#ffffff', // Default white
+      preserveObjectStacking: true,
+      selection: true,
+      controlsAboveOverlay: true,
     });
 
-    const handleSelection = (options: { selected?: FabricObject[] }) => {
-      if (options.selected && options.selected.length > 0) {
-        setSelectedObject(options.selected[0]);
+    // Event Listeners
+    const handleSelection = (e: { selected?: FabricObject[] }) => {
+      if (e.selected && e.selected.length > 0) {
+        setSelectedObject(e.selected[0]);
       } else {
         setSelectedObject(null);
       }
     };
 
-    const handleSelectionCleared = () => {
-      setSelectedObject(null);
-    };
+    const handleCleared = () => setSelectedObject(null);
 
     canvas.on('selection:created', handleSelection);
     canvas.on('selection:updated', handleSelection);
-    canvas.on('selection:cleared', handleSelectionCleared);
+    canvas.on('selection:cleared', handleCleared);
 
     setCanvas(canvas);
     setLocalCanvas(canvas);
 
+    // Initial Render
+    canvas.requestRenderAll();
+
+    // Cleanup
     return () => {
       canvas.off('selection:created', handleSelection);
       canvas.off('selection:updated', handleSelection);
-      canvas.off('selection:cleared', handleSelectionCleared);
-      canvas.dispose();
+      canvas.off('selection:cleared', handleCleared);
+      try {
+        canvas.dispose();
+      } catch (e) {
+        console.warn('Cleanup error', e);
+      }
       setCanvas(null);
       setLocalCanvas(null);
+      setSelectedObject(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Runs once on mount
+  }, []); // Run once on mount
 
-  // Effect to LOAD DATA when it arrives
+  // Handle Data Loading & Resizing
   useEffect(() => {
-    if (localCanvas && projectData) {
-      localCanvas.loadFromJSON(projectData, () => {
-        localCanvas.renderAll();
-      });
-    }
-  }, [localCanvas, projectData]);
+    if (!localCanvas) return;
 
-  // Effect to RESIZE canvas when props change
-  useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.width = width;
-      canvasRef.current.height = height;
+    // 1. Handle Resize
+    if (localCanvas.width !== width || localCanvas.height !== height) {
+      localCanvas.setDimensions({ width, height });
     }
-    if (localCanvas) {
-      localCanvas.setWidth(width);
-      localCanvas.setHeight(height);
-      localCanvas.calcOffset();
-      localCanvas.renderAll();
+
+    // 2. Handle Data Load
+    if (projectData) {
+      const loadData = async () => {
+        try {
+          const json = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+          
+          // Load data
+          await localCanvas.loadFromJSON(json);
+          
+          // Force properties that might be missing in JSON
+          if (!localCanvas.backgroundColor || localCanvas.backgroundColor === 'transparent') {
+            localCanvas.backgroundColor = '#ffffff';
+          }
+          
+          // Ensure dimensions from props override JSON dimensions (critical for resize)
+          localCanvas.setDimensions({ width, height });
+          
+          localCanvas.requestRenderAll();
+        } catch (err) {
+          console.error("Error loading canvas data:", err);
+          // Fallback if load fails
+          localCanvas.backgroundColor = '#ffffff';
+          localCanvas.requestRenderAll();
+        }
+      };
+      loadData();
+    } else {
+        // No data? Just ensure background is white
+        localCanvas.backgroundColor = '#ffffff';
+        localCanvas.requestRenderAll();
     }
-  }, [localCanvas, width, height]);
+
+  }, [localCanvas, projectData, width, height]);
 
   return (
-    // 3. FIX: Change 'flex: 1' to 'height: 100%'
-    // 4. FIX: Use a theme-aware background color for the centering box
     <Box
+      ref={containerRef}
       style={{
         height: '100%',
-        display: 'grid',
-        placeItems: 'center',
-        background: `light-dark(${theme.colors.gray[1]}, ${theme.colors.dark[9]})`,
+        width: '100%',
+        display: 'flex', // Changed to flex for better centering behavior
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.gray[1],
+        overflow: 'auto',
       }}
+      className="dark:bg-gray-900"
     >
-      {/* This is the white <canvas> element */}
-      <canvas ref={canvasRef} />
+      {/* Key prop forces React to replace the element on re-mounts, 
+        clearing any debris left by Fabric's wrapper.
+        The style prop ensures it has dimensions even before Fabric initializes.
+      */}
+      <canvas 
+        ref={canvasRef} 
+        key="fabric-canvas-element"
+        style={{ width: width, height: height }} 
+      />
     </Box>
   );
 };

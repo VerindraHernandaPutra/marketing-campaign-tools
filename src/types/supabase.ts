@@ -7,35 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -69,6 +42,9 @@ export type Database = {
           title: string
           updated_at: string | null
           user_id: string
+          organization_id: string | null
+          is_template: boolean | null
+          tags: string[] | null // <--- Added this
         }
         Insert: {
           canvas_data?: Json | null
@@ -78,6 +54,9 @@ export type Database = {
           title?: string
           updated_at?: string | null
           user_id: string
+          organization_id?: string | null
+          is_template?: boolean | null
+          tags?: string[] | null // <--- Added this
         }
         Update: {
           canvas_data?: Json | null
@@ -87,6 +66,9 @@ export type Database = {
           title?: string
           updated_at?: string | null
           user_id?: string
+          organization_id?: string | null
+          is_template?: boolean | null
+          tags?: string[] | null // <--- Added this
         }
         Relationships: []
       }

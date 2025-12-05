@@ -6,6 +6,8 @@ import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { AuthProvider } from './auth/AuthProvider';
 import { UserProvider } from './auth/UserContext';
+// FIX: Import Provider from Layout components, not context file
+import { NotificationProvider } from './components/Layout/NotificationProvider';
 import { MantineProvider } from '@mantine/core';
 
 const container = document.getElementById('root');
@@ -14,11 +16,13 @@ const root = createRoot(container!);
 root.render(
   <React.StrictMode>
     <MantineProvider>
-      <AuthProvider>
-        <UserProvider>
-          <AppRouter />
-        </UserProvider>
-      </AuthProvider>
+      <NotificationProvider>
+        <AuthProvider>
+          <UserProvider>
+            <AppRouter />
+          </UserProvider>
+        </AuthProvider>
+      </NotificationProvider>
     </MantineProvider>
   </React.StrictMode>
 );

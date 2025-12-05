@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, Select, Slider, Button, Group, Text, Stack } from '@mantine/core';
-import { DownloadIcon } from 'lucide-react';
+import { Modal, Select, Slider, Button, Group, Text, Stack, Collapse } from '@mantine/core';
+import { DownloadIcon, Settings2Icon } from 'lucide-react';
 
 interface DownloadModalProps {
   opened: boolean;
@@ -12,6 +12,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ opened, onClose, onDownlo
   const [format, setFormat] = useState<'png' | 'jpeg' | 'pdf'>('png');
   const [quality, setQuality] = useState(0.8);
   const [multiplier, setMultiplier] = useState(1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleDownload = () => {
     onDownload(format, quality, multiplier);
@@ -29,7 +30,6 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ opened, onClose, onDownlo
             { value: 'pdf', label: 'PDF (Standard Document)' },
           ]}
           value={format}
-          // FIX: Cast to specific union type instead of 'any'
           onChange={(val) => {
             if (val === 'png' || val === 'jpeg' || val === 'pdf') {
                 setFormat(val);
@@ -45,7 +45,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ opened, onClose, onDownlo
                 <Slider
                     value={multiplier}
                     onChange={setMultiplier}
-                    min={1}
+                    min={0.5}
                     max={3}
                     step={0.5}
                     marks={[
@@ -71,6 +71,23 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ opened, onClose, onDownlo
             )}
           </>
         )}
+
+        <Button 
+            variant="subtle" 
+            size="xs" 
+            leftSection={<Settings2Icon size={14} />} 
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            color="gray"
+        >
+            {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
+        </Button>
+
+        <Collapse in={showAdvanced}>
+            <Text size="xs" c="dimmed" mb="xs">
+                Custom resizing is applied via the multiplier slider above. 
+                For example, 2x will double the dimensions.
+            </Text>
+        </Collapse>
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={onClose}>Cancel</Button>

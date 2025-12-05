@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paper, Text, Box, UnstyledButton, MantineTheme, ThemeIcon } from '@mantine/core';
+import { Paper, Text, Box, UnstyledButton, MantineTheme, ThemeIcon, Loader } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
@@ -10,51 +10,69 @@ interface CreateNewCardProps {
   description: string;
   width?: number;
   height?: number;
+  // Optional click handler to override default logic
+  onClick?: () => void;
 }
 
-const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description, width, height }) => {
+interface ProjectPayload {
+  title: string;
+  user_id: string;
+  canvas_data: {
+    version: string;
+    width: number;
+    height: number;
+    objects: Record<string, unknown>[];
+    backgroundColor: string;
+  };
+}
+
+const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description, width, height, onClick }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreateNew = async () => {
+    if (onClick) {
+        onClick();
+        return;
+    }
+
     if (!user) return;
     setIsCreating(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: any = { 
-        title: title, 
-        user_id: user.id 
-    };
-
-    // If dimensions are provided, initialize canvas_data
-    if (width && height) {
-        payload.canvas_data = { 
-            version: "5.3.0", // Add version just in case
-            width, 
-            height, 
-            objects: [], 
-            // FIX: Use 'backgroundColor' (correct Fabric prop) and ensure it is hex
-            backgroundColor: '#ffffff' 
+    try {
+        const payload: ProjectPayload = { 
+            title: title === 'Custom Size' ? 'Untitled Project' : title, 
+            user_id: user.id,
+            canvas_data: { 
+                version: "5.3.0", 
+                width: width || 850, 
+                height: height || 500, 
+                objects: [], 
+                backgroundColor: '#ffffff' 
+            }
         };
-    }
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert(payload)
-      .select('id') 
-      .single();
-    
-    setIsCreating(false);
-
-    if (error) {
-      alert('Error creating project: ' + error.message);
-    } else if (data) {
-      navigate(`/editor/${data.id}`);
+        const { data, error } = await supabase
+        .from('projects')
+        .insert(payload)
+        .select('id') 
+        .single();
+        
+        if (error) throw error;
+        if (data) {
+            navigate(`/editor/${data.id}`);
+        }
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        alert('Error creating project: ' + message);
+    } finally {
+        setIsCreating(false);
     }
   };
   
-  return <UnstyledButton onClick={handleCreateNew} disabled={isCreating} className="w-full">
+  return (
+    <UnstyledButton onClick={handleCreateNew} disabled={isCreating} className="w-full">
       <Paper 
         shadow="xs" 
         p="sm" 
@@ -76,7 +94,7 @@ const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description,
             color="blue" 
             className="shrink-0"
         >
-            {icon}
+            {isCreating ? <Loader size="sm" color="white"/> : icon}
         </ThemeIcon>
         
         <Box>
@@ -89,7 +107,8 @@ const CreateNewCard: React.FC<CreateNewCardProps> = ({ icon, title, description,
             </Text>
         </Box>
       </Paper>
-    </UnstyledButton>;
+    </UnstyledButton>
+  );
 };
 
 export default CreateNewCard;
