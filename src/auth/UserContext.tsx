@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './useAuth';
 
@@ -20,12 +20,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loadingRole, setLoadingRole] = useState(true);
+  
+  // Track the last processed user to prevent unnecessary re-fetches on tab focus
+  const lastProcessedUserId = useRef<string | null>(null);
 
-  // FIX: Wrapped in useCallback to safely use in useEffect dependency array
   const fetchUserRole = useCallback(async () => {
-    // 🔴 CRITICAL FIX: Reset all permissions states immediately.
-    // This ensures that if you switch from 'Admin' to 'Designer', 
-    // the 'isSuperAdmin' flag doesn't persist.
+    // 1. OPTIMIZATION: If the user ID hasn't changed, don't wipe the state.
+    // This prevents the "flash" when switching tabs.
+    if (user?.id === lastProcessedUserId.current) {
+        return;
+    }
+
+    // 2. CRITICAL FIX: Set loading TRUE before clearing roles.
+    // This prevents RoleGuard from seeing "role: null" and showing Access Denied.
+    setLoadingRole(true);
+    
+    // Update the ref
+    lastProcessedUserId.current = user?.id || null;
+
+    // Reset permissions
     setIsSuperAdmin(false);
     setRole(null);
     setCurrentOrgId(null);
@@ -45,7 +58,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profile?.username === 'superadmin') { 
           setIsSuperAdmin(true);
-          // SuperAdmin has implicit 'admin' privileges everywhere contextually
           setRole('admin');
           setLoadingRole(false);
           return; 
@@ -61,7 +73,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (membership) {
         setCurrentOrgId(membership.organization_id);
-        // Cast the string role from DB to our UserRole type
         setRole(membership.role as UserRole);
       } else {
         setRole(null);
@@ -74,7 +85,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // FIX: Added dependency array
   useEffect(() => {
     fetchUserRole();
   }, [fetchUserRole]);

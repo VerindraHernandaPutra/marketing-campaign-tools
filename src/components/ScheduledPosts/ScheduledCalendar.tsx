@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+//
+import React, { useEffect, useState, useCallback } from 'react';
 import { Paper, Box, Loader } from '@mantine/core';
 import FullCalendar from '@fullcalendar/react';
 import { EventClickArg } from '@fullcalendar/core';
@@ -15,9 +16,11 @@ interface CalendarEvent {
   start: string;
   backgroundColor?: string;
   borderColor?: string;
+  allDay?: boolean;
   extendedProps?: {
-    platforms: string[];
-    status: string;
+    platforms?: string[];
+    status?: string;
+    type?: 'campaign' | 'holiday';
   };
 }
 
@@ -27,53 +30,97 @@ const ScheduledCalendar: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Helper to assign colors based on platform
   const getPlatformColor = (platforms: string[]) => {
     if (platforms.includes('whatsapp')) return '#25D366';
     if (platforms.includes('instagram')) return '#E4405F';
     if (platforms.includes('facebook')) return '#1877F2';
     if (platforms.includes('email')) return '#EA4335';
     if (platforms.includes('twitter')) return '#1DA1F2';
-    return '#888888'; // Default gray
+    return '#888888';
   };
 
-  useEffect(() => {
-    const fetchScheduledCampaigns = async () => {
-      if (!user) return;
-      setLoading(true);
+  // 1. Fetch Holidays from Public API
+  const fetchHolidays = async (year: number) => {
+    try {
+      // Using Nager.Date API (Free, no key required). 
+      // Changed country code to 'ID' (Indonesia) based on your location. Change to 'US' or others as needed.
+      const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/ID`);
+      if (!response.ok) throw new Error('Failed to fetch holidays');
+      
+      const data = await response.json();
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return data.map((holiday: any) => ({
+        id: `holiday-${holiday.date}-${holiday.name}`,
+        title: `🎉 ${holiday.name}`, // Added emoji to distinguish visually
+        start: holiday.date,
+        allDay: true,
+        backgroundColor: '#FFC107', // Amber color for holidays
+        borderColor: '#FFC107',
+        extendedProps: {
+          type: 'holiday',
+          status: 'holiday'
+        }
+      }));
+    } catch (e) {
+      console.error("Error fetching holidays:", e);
+      return [];
+    }
+  };
 
-      const { data, error } = await supabase
-        .from('marketing_campaigns')
-        .select('id, title, scheduled_date, platforms, status')
-        .eq('user_id', user.id)
-        .not('scheduled_date', 'is', null); // Only get scheduled items
+  const loadAllEvents = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
 
-      if (error) {
-        console.error('Error fetching calendar events:', error);
-      } else if (data) {
+    try {
+        // 2. Fetch Campaigns (Existing Logic)
+        const { data: campaignData, error } = await supabase
+            .from('marketing_campaigns')
+            .select('id, title, scheduled_date, platforms, status')
+            .eq('user_id', user.id)
+            .not('scheduled_date', 'is', null);
+
+        if (error) throw error;
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const formattedEvents: CalendarEvent[] = data.map((campaign: any) => ({
-          id: campaign.id,
-          title: `${campaign.title} (${campaign.platforms?.[0] || 'General'})`,
-          start: campaign.scheduled_date,
-          backgroundColor: getPlatformColor(campaign.platforms || []),
-          borderColor: getPlatformColor(campaign.platforms || []),
-          extendedProps: {
-            platforms: campaign.platforms,
-            status: campaign.status
-          }
+        const campaignEvents: CalendarEvent[] = (campaignData || []).map((campaign: any) => ({
+            id: campaign.id,
+            title: `${campaign.title} (${campaign.platforms?.[0] || 'General'})`,
+            start: campaign.scheduled_date,
+            backgroundColor: getPlatformColor(campaign.platforms || []),
+            borderColor: getPlatformColor(campaign.platforms || []),
+            extendedProps: {
+                platforms: campaign.platforms,
+                status: campaign.status,
+                type: 'campaign'
+            }
         }));
-        setEvents(formattedEvents);
-      }
-      setLoading(false);
-    };
 
-    fetchScheduledCampaigns();
+        // 3. Fetch Holidays
+        const currentYear = new Date().getFullYear();
+        // Fetch for current and next year to cover year boundaries
+        const holidaysCurrent = await fetchHolidays(currentYear);
+        const holidaysNext = await fetchHolidays(currentYear + 1);
+
+        // 4. Merge Data
+        setEvents([...campaignEvents, ...holidaysCurrent, ...holidaysNext]);
+
+    } catch (error) {
+        console.error('Error loading calendar data:', error);
+    } finally {
+        setLoading(false);
+    }
   }, [user]);
 
+  useEffect(() => {
+    loadAllEvents();
+  }, [loadAllEvents]);
+
   const handleEventClick = (info: EventClickArg) => {
-    // Navigate to edit page when clicked
-    navigate(`/campaign-manager/edit/${info.event.id}`);
+    // Only navigate if it's a campaign, ignore clicks on holidays
+    if (info.event.extendedProps.type === 'campaign') {
+        navigate(`/campaign-manager/edit/${info.event.id}`);
+    }
   };
 
   if (loading) {
@@ -86,6 +133,16 @@ const ScheduledCalendar: React.FC = () => {
 
   return (
     <Paper shadow="sm" p="xl">
+      <style>{`
+        .sunday-cell {
+          background-color: rgba(255, 0, 0, 0.05) !important;
+        }
+        /* Optional: Change cursor for holidays to default since they aren't clickable */
+        .fc-event[style*="background-color: rgb(255, 193, 7)"] {
+            cursor: default;
+        }
+      `}</style>
+      
       <Box className="calendar-container">
         <FullCalendar 
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]} 
@@ -98,8 +155,13 @@ const ScheduledCalendar: React.FC = () => {
           events={events} 
           eventClick={handleEventClick} 
           height="auto" 
-          editable={false} // Set to true if you implement drag-and-drop rescheduling later
-          selectable={true} 
+          selectable={true}
+          dayCellClassNames={(arg) => {
+            if (arg.date.getDay() === 0) {
+              return ['sunday-cell'];
+            }
+            return [];
+          }}
         />
       </Box>
     </Paper>

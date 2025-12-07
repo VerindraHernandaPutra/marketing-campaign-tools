@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MantineProvider, Flex, Container, Title, Box, TextInput, 
   SimpleGrid, Button, Group, Loader, Text, Center, ScrollArea, Chip,
-  SegmentedControl, Tooltip, Modal, Stack, Paper, Table, Avatar, Badge, ActionIcon
+  SegmentedControl, Tooltip, Modal, Stack, Paper, Table, Avatar, Badge, ActionIcon,
+  Pagination, Select, ThemeIcon
 } from '@mantine/core';
 import { useColorScheme } from '@mantine/hooks';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
@@ -14,7 +15,7 @@ import ConfirmationModal from '../components/Layout/ConfirmationModal';
 import { 
   SearchIcon, PlusIcon, FilterIcon, GridIcon, ListIcon, 
   LayoutTemplateIcon, FileTextIcon, TrashIcon, EditIcon, 
-  FacebookIcon, InstagramIcon, MailIcon, LayoutIcon 
+  FacebookIcon, InstagramIcon, MailIcon, LayoutIcon, SortAscIcon, CheckIcon
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
@@ -28,6 +29,7 @@ interface Project {
   title: string;
   thumbnail_url: string | null;
   updated_at: string | null;
+  created_at: string | null;
   canvas_data: { width?: number; height?: number; [key: string]: unknown };
   is_template: boolean;
   organization_id: string;
@@ -45,11 +47,18 @@ const Campaigns: React.FC = () => {
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
 
+  // View & Sort States
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<string>('updated_desc');
+  const [selectedTag, setSelectedTag] = useState<string>('All');
+
+  // Pagination States
+  const [activePage, setActivePage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<string>('12');
+
   const [campaigns, setCampaigns] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string>('All');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Modal States
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
@@ -58,30 +67,26 @@ const Campaigns: React.FC = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
-  // Operator Permission Check
+  // Permissions
   const isOperator = isSuperAdmin || role === 'operator';
-  // Marketers can also view/create campaigns typically
   const canManageCampaigns = isOperator || role === 'marketer';
+
+  // Reset pagination
+  useEffect(() => {
+    setActivePage(1);
+  }, [searchQuery, sortBy, selectedTag, itemsPerPage]);
 
   const fetchCampaigns = useCallback(async () => {
     if (!currentOrgId) return;
     setLoading(true);
 
     // Fetch projects that are NOT templates (is_template = false)
-    let query = supabase
+    const query = supabase
       .from('projects')
       .select('*')
       .eq('organization_id', currentOrgId)
       .eq('is_template', false) 
       .order('updated_at', { ascending: false });
-
-    if (searchQuery) {
-      query = query.ilike('title', `%${searchQuery}%`);
-    }
-
-    if (selectedTag !== 'All') {
-      query = query.contains('tags', [selectedTag]);
-    }
 
     const { data, error } = await query;
 
@@ -91,11 +96,52 @@ const Campaigns: React.FC = () => {
       setCampaigns(data as Project[]);
     }
     setLoading(false);
-  }, [currentOrgId, searchQuery, selectedTag]);
+  }, [currentOrgId]);
 
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
+
+  // --- Process Data ---
+  const processData = () => {
+    let filtered = [...campaigns];
+
+    // 1. Tag Filtering
+    if (selectedTag !== 'All') {
+        filtered = filtered.filter(p => p.tags?.includes(selectedTag));
+    }
+
+    // 2. Search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.title.toLowerCase().includes(query) || 
+        p.tags?.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
+
+    // 3. Sorting
+    filtered.sort((a, b) => {
+        switch (sortBy) {
+            case 'name_asc': return a.title.localeCompare(b.title);
+            case 'name_desc': return b.title.localeCompare(a.title);
+            case 'created_desc': return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            case 'updated_desc': default: return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+        }
+    });
+
+    // 4. Pagination
+    const totalItems = filtered.length;
+    const limit = parseInt(itemsPerPage);
+    const totalPages = Math.ceil(totalItems / limit);
+    const start = (activePage - 1) * limit;
+    const end = start + limit;
+    const paginatedItems = filtered.slice(start, end);
+
+    return { paginatedItems, totalItems, totalPages };
+  };
+
+  const { paginatedItems, totalItems, totalPages } = processData();
 
   // --- Creation Logic ---
   const handleCreateProject = async (
@@ -110,7 +156,6 @@ const Campaigns: React.FC = () => {
     
     const finalWidth = width || 850;
     const finalHeight = height || 500;
-    const finalTags = tags;
 
     try {
       const { data, error } = await supabase
@@ -120,7 +165,7 @@ const Campaigns: React.FC = () => {
           user_id: user.id,
           organization_id: currentOrgId,
           is_template: isTemplate,
-          tags: finalTags,
+          tags: tags,
           canvas_data: {
             version: "5.3.0",
             width: finalWidth,
@@ -146,14 +191,20 @@ const Campaigns: React.FC = () => {
     }
   };
 
-  const handleSizeCardClick = (width?: number, height?: number, title?: string, autoTags: string[] = []) => {
+  const handleSizeCardClick = (width?: number, height?: number, title?: string, autoTags: string[] = [], forceCampaign = false) => {
       const finalTitle = title || 'Untitled Design';
       
+      // If forced to campaign, skip choice
+      if (forceCampaign) {
+          handleCreateProject(width, height, finalTitle, autoTags, false);
+          setIsDesignModalOpen(false);
+          return;
+      }
+
       if (isOperator) {
-          // Allow operators to choose categorization
+          setIsDesignModalOpen(false);
           setCreationPreset({ width, height, title: finalTitle, tags: autoTags });
       } else {
-          // Standard creation for others (non-template)
           handleCreateProject(width, height, finalTitle, autoTags, false);
       }
   };
@@ -184,7 +235,7 @@ const Campaigns: React.FC = () => {
       const { data: newProject, error } = await supabase.from('projects').insert({
           user_id: user.id,
           organization_id: currentOrgId,
-          is_template: false, // Creating instance
+          is_template: false, 
           title: `${project.title} (Copy)`,
           canvas_data: project.canvas_data,
           thumbnail_url: project.thumbnail_url,
@@ -202,12 +253,62 @@ const Campaigns: React.FC = () => {
   };
 
   // --- Sub-components ---
-  const CreationOptions = () => (
+  const ViewToggle = () => (
+    <SegmentedControl 
+        value={viewMode}
+        onChange={(val) => setViewMode(val as 'grid' | 'list')}
+        data={[
+            { label: <Tooltip label="Grid View"><GridIcon size={16}/></Tooltip>, value: 'grid' },
+            { label: <Tooltip label="List View"><ListIcon size={16}/></Tooltip>, value: 'list' },
+        ]}
+    />
+  );
+
+  // FIX: Using isTemplateMode prop inside the component logic
+  const CreationOptions = ({ isTemplateMode = false, forceCampaign = false }: { isTemplateMode?: boolean, forceCampaign?: boolean }) => (
     <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-      <CreateNewCard icon={<LayoutIcon size={24} />} title="Custom Size" description="Start from scratch" onClick={() => handleSizeCardClick(undefined, undefined, 'Custom Design', ['Custom'])} />
-      <CreateNewCard icon={<InstagramIcon size={24} />} title="Instagram Post" description="1080 x 1080 px" width={1080} height={1080} onClick={() => handleSizeCardClick(1080, 1080, 'Instagram Post', ['Social Media', 'Instagram'])} />
-      <CreateNewCard icon={<FacebookIcon size={24} />} title="Facebook Post" description="1200 x 630 px" width={1200} height={630} onClick={() => handleSizeCardClick(1200, 630, 'Facebook Post', ['Social Media', 'Facebook'])} />
-      <CreateNewCard icon={<MailIcon size={24} />} title="Email Header" description="600 x 200 px" width={600} height={200} onClick={() => handleSizeCardClick(600, 200, 'Email Header', ['Email', 'Marketing'])} />
+      <CreateNewCard 
+        icon={<LayoutIcon size={24} />} 
+        title="Custom Size" 
+        description="Start from scratch" 
+        onClick={() => isTemplateMode 
+            ? handleCreateProject(undefined, undefined, 'Custom Template', ['Custom'], true) 
+            : handleSizeCardClick(undefined, undefined, 'Custom Design', ['Custom'], forceCampaign)
+        } 
+      />
+      <CreateNewCard 
+        icon={<InstagramIcon size={24} />} 
+        title="Instagram Post" 
+        description="1080 x 1080 px" 
+        width={1080} 
+        height={1080} 
+        onClick={() => isTemplateMode 
+            ? handleCreateProject(1080, 1080, 'Instagram Template', ['Social Media', 'Instagram'], true) 
+            : handleSizeCardClick(1080, 1080, 'Instagram Post', ['Social Media', 'Instagram'], forceCampaign)
+        } 
+      />
+      <CreateNewCard 
+        icon={<FacebookIcon size={24} />} 
+        title="Facebook Post" 
+        description="1200 x 630 px" 
+        width={1200} 
+        height={630} 
+        onClick={() => isTemplateMode 
+            ? handleCreateProject(1200, 630, 'Facebook Template', ['Social Media', 'Facebook'], true) 
+            : handleSizeCardClick(1200, 630, 'Facebook Post', ['Social Media', 'Facebook'], forceCampaign)
+        } 
+      />
+      <CreateNewCard 
+        icon={<MailIcon size={24} />} 
+        title="Email Header" 
+        description="600 x 200 px" 
+        width={600} 
+        height={200} 
+        onClick={() => isTemplateMode 
+            ? handleCreateProject(600, 200, 'Email Template', ['Email', 'Marketing'], true) 
+            : handleSizeCardClick(600, 200, 'Email Header', ['Email', 'Marketing'], forceCampaign)
+        } 
+      />
     </SimpleGrid>
   );
 
@@ -242,14 +343,7 @@ const Campaigns: React.FC = () => {
                 </div>
                 
                 <Group>
-                    <SegmentedControl 
-                        value={viewMode}
-                        onChange={(val) => setViewMode(val as 'grid' | 'list')}
-                        data={[
-                            { label: <Tooltip label="Grid View"><GridIcon size={16}/></Tooltip>, value: 'grid' },
-                            { label: <Tooltip label="List View"><ListIcon size={16}/></Tooltip>, value: 'list' },
-                        ]}
-                    />
+                    <ViewToggle />
                     {canManageCampaigns && (
                     <Button 
                         leftSection={<PlusIcon size={16} />} 
@@ -262,16 +356,40 @@ const Campaigns: React.FC = () => {
                 </Group>
               </Group>
 
-              <Group justify="space-between" mb="lg">
-                 <TextInput 
-                    placeholder="Search designs..." 
-                    leftSection={<SearchIcon size={16} />} 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.currentTarget.value)} 
-                    w={300} 
-                />
-                
-                <ScrollArea type="never" w={{ base: '100%', md: 'auto' }}>
+              <Box my="md">
+                 <Group justify="space-between" mb="md">
+                    <Group gap="xs">
+                        <TextInput 
+                          placeholder="Search designs..." 
+                          leftSection={<SearchIcon size={16} />} 
+                          value={searchQuery} 
+                          onChange={e => setSearchQuery(e.currentTarget.value)} 
+                          w={300} 
+                        />
+                        <Select 
+                            data={[
+                                { value: 'updated_desc', label: 'Recently Updated' },
+                                { value: 'created_desc', label: 'Recently Created' },
+                                { value: 'name_asc', label: 'Name (A-Z)' },
+                                { value: 'name_desc', label: 'Name (Z-A)' },
+                            ]}
+                            value={sortBy}
+                            onChange={(v) => setSortBy(v || 'updated_desc')}
+                            w={180}
+                            allowDeselect={false}
+                            leftSection={<SortAscIcon size={14} />}
+                        />
+                        <Select 
+                            data={['12', '24', '48', '96']} 
+                            value={itemsPerPage} 
+                            onChange={(v) => setItemsPerPage(v || '12')}
+                            w={70}
+                            allowDeselect={false}
+                        />
+                    </Group>
+                 </Group>
+
+                 <ScrollArea type="never" mb="lg">
                     <Group gap="sm" wrap="nowrap">
                         <FilterIcon size={16} className="text-gray-400" />
                         {CAMPAIGN_TAGS.map(tag => (
@@ -281,97 +399,118 @@ const Campaigns: React.FC = () => {
                         ))}
                     </Group>
                 </ScrollArea>
-              </Group>
+              </Box>
 
               {loading ? (
                 <Center h={200}><Loader /></Center>
               ) : (
                 <>
-                  {campaigns.length === 0 ? (
-                    <Text c="dimmed" ta="center" mt="xl">No campaign designs found.</Text>
+                  {totalItems === 0 ? (
+                    <Center mt="xl" h={200}>
+                      <Stack align="center" gap="xs">
+                        <Text c="dimmed">No campaign designs found matching your search.</Text>
+                        {searchQuery && <Button variant="subtle" size="xs" onClick={() => setSearchQuery('')}>Clear Search</Button>}
+                      </Stack>
+                    </Center>
                   ) : (
-                    viewMode === 'grid' ? (
-                        <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
-                        {campaigns.map(design => (
-                            <DesignCard 
-                            key={design.id} 
-                            design={{
-                                id: design.id,
-                                title: design.title,
-                                thumbnail: design.thumbnail_url || '',
-                                updated_at: design.updated_at,
-                                canvas_data: design.canvas_data,
-                                tags: design.tags
-                            }}
-                            isTemplate={false} 
-                            onRefresh={fetchCampaigns}
-                            />
-                        ))}
-                        </SimpleGrid>
-                    ) : (
-                        <Paper shadow="sm" withBorder>
-                            <Table striped highlightOnHover verticalSpacing="sm">
-                                <Table.Thead>
-                                    <Table.Tr>
-                                        <Table.Th>Design Name</Table.Th>
-                                        <Table.Th>Tags</Table.Th>
-                                        <Table.Th>Dimensions</Table.Th>
-                                        <Table.Th>Last Updated</Table.Th>
-                                        <Table.Th align="right">Actions</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    {campaigns.map(t => (
-                                        <Table.Tr key={t.id}>
-                                            <Table.Td>
-                                                <Group gap="sm">
-                                                    <Avatar src={t.thumbnail_url} radius="sm" size="lg" />
-                                                    <div>
-                                                        <Text fw={500}>{t.title}</Text>
-                                                        <Text size="xs" c="dimmed">ID: {t.id.substring(0, 8)}...</Text>
-                                                    </div>
-                                                </Group>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Group gap={4}>
-                                                    {t.tags?.map(tag => <Badge key={tag} size="xs" variant="outline">{tag}</Badge>)}
-                                                </Group>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Text size="sm">{t.canvas_data?.width || '?'} x {t.canvas_data?.height || '?'}</Text>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Text size="sm">{new Date(t.updated_at || '').toLocaleDateString()}</Text>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Group justify="flex-end" gap="xs">
-                                                    <Tooltip label="Edit">
-                                                        <ActionIcon variant="light" color="blue" onClick={() => navigate(`/editor/${t.id}`)}>
-                                                            <EditIcon size={16} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                    
-                                                    <Tooltip label="Duplicate">
-                                                        <ActionIcon variant="light" color="green" onClick={() => handleDuplicate(t)}>
-                                                            <LayoutTemplateIcon size={16} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                    
-                                                    {canManageCampaigns && (
-                                                        <Tooltip label="Delete">
-                                                            <ActionIcon variant="light" color="red" onClick={() => handleDeleteClick(t.id)}>
-                                                                <TrashIcon size={16} />
+                    <Stack gap="lg">
+                        {viewMode === 'grid' ? (
+                            <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
+                            {paginatedItems.map(design => (
+                                <DesignCard 
+                                key={design.id} 
+                                design={{
+                                    id: design.id,
+                                    title: design.title,
+                                    thumbnail: design.thumbnail_url || '',
+                                    updated_at: design.updated_at,
+                                    canvas_data: design.canvas_data,
+                                    tags: design.tags
+                                }}
+                                isTemplate={false} 
+                                onRefresh={fetchCampaigns}
+                                />
+                            ))}
+                            </SimpleGrid>
+                        ) : (
+                            <Paper shadow="sm" withBorder>
+                                <Table striped highlightOnHover verticalSpacing="sm">
+                                    <Table.Thead>
+                                        <Table.Tr>
+                                            <Table.Th>Design Name</Table.Th>
+                                            <Table.Th>Tags</Table.Th>
+                                            <Table.Th>Dimensions</Table.Th>
+                                            <Table.Th>Last Updated</Table.Th>
+                                            <Table.Th align="right">Actions</Table.Th>
+                                        </Table.Tr>
+                                    </Table.Thead>
+                                    <Table.Tbody>
+                                        {paginatedItems.map(t => (
+                                            <Table.Tr key={t.id}>
+                                                <Table.Td>
+                                                    <Group gap="sm">
+                                                        <Avatar src={t.thumbnail_url} radius="sm" size="lg" />
+                                                        <div>
+                                                            <Text fw={500}>{t.title}</Text>
+                                                            <Text size="xs" c="dimmed">ID: {t.id.substring(0, 8)}...</Text>
+                                                        </div>
+                                                    </Group>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Group gap={4}>
+                                                        {t.tags?.map(tag => <Badge key={tag} size="xs" variant="outline">{tag}</Badge>)}
+                                                    </Group>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Text size="sm">{t.canvas_data?.width || '?'} x {t.canvas_data?.height || '?'}</Text>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Text size="sm">{new Date(t.updated_at || '').toLocaleDateString()}</Text>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Group justify="flex-end" gap="xs">
+                                                        <Tooltip label="Edit">
+                                                            <ActionIcon variant="light" color="blue" onClick={() => navigate(`/editor/${t.id}`)}>
+                                                                <EditIcon size={16} />
                                                             </ActionIcon>
                                                         </Tooltip>
-                                                    )}
-                                                </Group>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    ))}
-                                </Table.Tbody>
-                            </Table>
-                        </Paper>
-                    )
+                                                        
+                                                        <Tooltip label="Duplicate">
+                                                            <ActionIcon variant="light" color="green" onClick={() => handleDuplicate(t)}>
+                                                                <LayoutTemplateIcon size={16} />
+                                                            </ActionIcon>
+                                                        </Tooltip>
+                                                        
+                                                        {canManageCampaigns && (
+                                                            <Tooltip label="Delete">
+                                                                <ActionIcon variant="light" color="red" onClick={() => handleDeleteClick(t.id)}>
+                                                                    <TrashIcon size={16} />
+                                                                </ActionIcon>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Group>
+                                                </Table.Td>
+                                            </Table.Tr>
+                                        ))}
+                                    </Table.Tbody>
+                                </Table>
+                            </Paper>
+                        )}
+
+                        {totalPages > 1 && (
+                            <Group justify="space-between" mt="md">
+                                <Text size="sm" c="dimmed">
+                                    Showing {(activePage - 1) * parseInt(itemsPerPage) + 1} - {Math.min(activePage * parseInt(itemsPerPage), totalItems)} of {totalItems}
+                                </Text>
+                                <Pagination 
+                                    total={totalPages} 
+                                    value={activePage} 
+                                    onChange={setActivePage} 
+                                    color="blue"
+                                />
+                            </Group>
+                        )}
+                    </Stack>
                   )}
                 </>
               )}
@@ -384,24 +523,74 @@ const Campaigns: React.FC = () => {
             <Box mb="lg">
                 <Text c="dimmed" size="sm">Select a size to start designing.</Text>
             </Box>
-            <CreationOptions />
+            {/* Pass forceCampaign=true to bypass Operator choice modal */}
+            <CreationOptions forceCampaign={true} />
         </Modal>
 
-        {/* Operator Choice Modal (Only if triggered by Operator via Size Card) */}
-        <Modal opened={!!creationPreset} onClose={() => setCreationPreset(null)} title="Categorize Design" size="md" centered>
-            <Text size="sm" c="dimmed" mb="xl">How would you like to create this?</Text>
+        {/* Operator Choice Modal (Only if triggered by Operator via Size Card via other paths, keeping logic robust) */}
+        <Modal 
+            opened={!!creationPreset} 
+            onClose={() => setCreationPreset(null)} 
+            title={
+                <Group gap="xs">
+                    <ThemeIcon variant="light" color="blue"><PlusIcon size={16} /></ThemeIcon>
+                    <Text fw={600}>Create New Design</Text>
+                </Group>
+            }
+            size="md" 
+            centered
+            radius="md"
+            padding="xl"
+        >
+            <Text size="sm" c="dimmed" mb="lg">
+                You are creating <b>{creationPreset?.title}</b>. How would you like to categorize this design for your team?
+            </Text>
             <Stack gap="md">
-                <Button size="lg" variant="light" color="blue" fullWidth h="auto" py="md" justify="flex-start" leftSection={<LayoutTemplateIcon size={24} />} onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title + ' Template', creationPreset.tags, true)} loading={isCreationLoading}>
-                    <div className="flex flex-col items-start">
-                        <Text size="sm" fw={600}>Create as Template</Text>
-                        <Text size="xs" c="dimmed" fw={400} style={{ opacity: 0.8 }}>Visible to Designers</Text>
+                <Button 
+                    size="xl" 
+                    variant="light" 
+                    color="blue" 
+                    fullWidth 
+                    h="auto" 
+                    py="md" 
+                    justify="flex-start" 
+                    leftSection={
+                        <ThemeIcon size={40} radius="xl" variant="filled" color="blue">
+                            <LayoutTemplateIcon size={20} />
+                        </ThemeIcon>
+                    }
+                    onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title + ' Template', creationPreset.tags, true)}
+                    loading={isCreationLoading}
+                    styles={{ inner: { justifyContent: 'flex-start' }, label: { width: '100%', textAlign: 'left' } }}
+                >
+                    <div className="flex flex-col items-start w-full ml-2 text-left">
+                        <Text size="md" fw={600}>Create as Template</Text>
+                        <Text size="xs" c="dimmed" fw={400} ta="left" style={{ opacity: 0.8, whiteSpace: 'normal', lineHeight: 1.3 }}>Visible to Designers</Text>
                     </div>
+                    <div className="ml-auto"><ThemeIcon variant="subtle" color="blue"><CheckIcon size={16} /></ThemeIcon></div>
                 </Button>
-                <Button size="lg" variant="outline" color="green" fullWidth h="auto" py="md" justify="flex-start" leftSection={<FileTextIcon size={24} />} onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title, creationPreset.tags, false)} loading={isCreationLoading}>
-                    <div className="flex flex-col items-start">
-                        <Text size="sm" fw={600}>Create for Campaign</Text>
-                        <Text size="xs" c="dimmed" fw={400} style={{ opacity: 0.8 }}>Standard Project</Text>
+                <Button 
+                    size="xl" 
+                    variant="outline" 
+                    color="green" 
+                    fullWidth 
+                    h="auto" 
+                    py="md" 
+                    justify="flex-start" 
+                    leftSection={
+                        <ThemeIcon size={40} radius="xl" variant="filled" color="green">
+                            <FileTextIcon size={20} />
+                        </ThemeIcon>
+                    }
+                    onClick={() => creationPreset && handleCreateProject(creationPreset.width, creationPreset.height, creationPreset.title, creationPreset.tags, false)}
+                    loading={isCreationLoading}
+                    styles={{ inner: { justifyContent: 'flex-start' }, label: { width: '100%', textAlign: 'left' } }}
+                >
+                    <div className="flex flex-col items-start w-full ml-2 text-left">
+                        <Text size="md" fw={600}>Create for Campaign</Text>
+                        <Text size="xs" c="dimmed" fw={400} ta="left" style={{ opacity: 0.8, whiteSpace: 'normal', lineHeight: 1.3 }}>Standard Project</Text>
                     </div>
+                    <div className="ml-auto"><ThemeIcon variant="subtle" color="green"><CheckIcon size={16} /></ThemeIcon></div>
                 </Button>
             </Stack>
         </Modal>

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Title, Tabs, Table, Button, Group, Modal, TextInput, Loader, Badge, ActionIcon, Text, Select, Paper, Tooltip, PasswordInput, Textarea, Switch, SimpleGrid, ThemeIcon, NumberInput } from '@mantine/core';
+// [cite: src/pages/AdminDashboard.tsx]
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Container, Title, Tabs, Table, Button, Group, Modal, TextInput, Loader, Badge, ActionIcon, Text, Select, Paper, Tooltip, PasswordInput, Textarea, Switch, SimpleGrid, ThemeIcon, NumberInput, Pagination } from '@mantine/core';
 import { supabase } from '../supabaseClient';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
 import { useColorScheme } from '@mantine/hooks';
 import { MantineProvider } from '@mantine/core';
-import { EditIcon, TrashIcon, UsersIcon, BanIcon, CheckCircleIcon, PlusIcon, UserPlusIcon, BuildingIcon, ActivityIcon } from 'lucide-react';
+import { EditIcon, TrashIcon, UsersIcon, BanIcon, CheckCircleIcon, PlusIcon, BuildingIcon, ActivityIcon, SearchIcon, SortAscIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -15,7 +16,6 @@ interface Organization {
   description?: string;
   status: string;
   created_at: string;
-  // New limits
   max_operators?: number;
   max_designers?: number;
   max_marketers?: number;
@@ -45,12 +45,16 @@ const AdminDashboard: React.FC = () => {
   const [userList, setUserList] = useState<ProfileWithRole[]>([]);
   const [loading, setLoading] = useState(false);
   
+  // -- Advanced Table States --
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activePage, setActivePage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<string>('10');
+  const [sortBy, setSortBy] = useState<string>('created_desc');
+
   // -- Organization Modal State --
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [orgModalMode, setOrgModalMode] = useState<'create' | 'edit'>('create');
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-  
-  // Org Form Fields
   const [orgFormName, setOrgFormName] = useState('');
   const [orgFormDesc, setOrgFormDesc] = useState('');
   const [orgFormStatus, setOrgFormStatus] = useState(true);
@@ -71,38 +75,107 @@ const AdminDashboard: React.FC = () => {
 
   const orgSelectData = orgList.map(o => ({ value: o.id, label: o.name }));
 
+  // Reset table state on tab change
+  useEffect(() => {
+    setSearchQuery('');
+    setActivePage(1);
+    setSortBy('created_desc');
+  }, [activeTab]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: orgs } = await supabase.from('organizations').select('*').order('created_at', { ascending: false });
     if (orgs) setOrgList(orgs as Organization[]);
 
-    if (activeTab === 'all_users' || activeTab === 'overview') {
-        const { data: profiles } = await supabase.from('profiles').select('*').order('updated_at', { ascending: false });
-        const { data: memberships } = await supabase.from('organization_members').select('id, user_id, role, status, organization_id, organizations(name)');
+    // Always fetch users to have data ready for Analytics tab stats if needed, or lazy load
+    const { data: profiles } = await supabase.from('profiles').select('*').order('updated_at', { ascending: false });
+    const { data: memberships } = await supabase.from('organization_members').select('id, user_id, role, status, organization_id, organizations(name)');
 
-        if (profiles) {
+    if (profiles) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const combined: ProfileWithRole[] = profiles.map((p: any) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const combined: ProfileWithRole[] = profiles.map((p: any) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const membership = memberships?.find((m: any) => m.user_id === p.id);
-                return {
-                    ...p,
-                    organization_name: membership?.organizations?.name || '-',
-                    role: membership?.role || '-',
-                    organization_id: membership?.organization_id,
-                    membership_id: membership?.id,
-                    status: membership?.status || '-'
-                };
-            });
-            setUserList(combined);
-        }
+            const membership = memberships?.find((m: any) => m.user_id === p.id);
+            return {
+                ...p,
+                organization_name: membership?.organizations?.name || '-',
+                role: membership?.role || '-',
+                organization_id: membership?.organization_id,
+                membership_id: membership?.id,
+                status: membership?.status || '-'
+            };
+        });
+        setUserList(combined);
     }
     setLoading(false);
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // --- Data Processing Logic ---
+  const processOrgs = useMemo(() => {
+    let data = [...orgList];
+
+    // Search
+    if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        data = data.filter(o => 
+            o.name.toLowerCase().includes(query) || 
+            o.description?.toLowerCase().includes(query)
+        );
+    }
+
+    // Sort
+    data.sort((a, b) => {
+        if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+        if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+        if (sortBy === 'status') return (a.status || '').localeCompare(b.status || '');
+        // Default created_desc
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    // Paginate
+    const total = data.length;
+    const limit = parseInt(itemsPerPage);
+    const totalPages = Math.ceil(total / limit);
+    const paginated = data.slice((activePage - 1) * limit, activePage * limit);
+
+    return { data: paginated, total, totalPages };
+  }, [orgList, searchQuery, sortBy, activePage, itemsPerPage]);
+
+  const processUsers = useMemo(() => {
+    let data = [...userList];
+
+    // Search
+    if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        data = data.filter(u => 
+            u.username?.toLowerCase().includes(query) || 
+            u.email?.toLowerCase().includes(query) ||
+            u.organization_name?.toLowerCase().includes(query)
+        );
+    }
+
+    // Sort
+    data.sort((a, b) => {
+        if (sortBy === 'name_asc') return (a.username || '').localeCompare(b.username || '');
+        if (sortBy === 'email') return a.email.localeCompare(b.email);
+        if (sortBy === 'role') return (a.role || '').localeCompare(b.role || '');
+        // Default updated_desc
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
+
+    // Paginate
+    const total = data.length;
+    const limit = parseInt(itemsPerPage);
+    const totalPages = Math.ceil(total / limit);
+    const paginated = data.slice((activePage - 1) * limit, activePage * limit);
+
+    return { data: paginated, total, totalPages };
+  }, [userList, searchQuery, sortBy, activePage, itemsPerPage]);
+
 
   // Analytics Stats
   const getAnalytics = () => {
@@ -267,6 +340,47 @@ const AdminDashboard: React.FC = () => {
       else fetchData();
   };
 
+  // Reusable Controls Component
+  const TableControls = ({ 
+    placeholder, 
+    sortOptions, 
+    onAdd, 
+    addLabel 
+  }: { 
+    placeholder: string, 
+    sortOptions: { value: string, label: string }[], 
+    onAdd: () => void, 
+    addLabel: string 
+  }) => (
+    <Group justify="space-between" mb="md">
+        <Group gap="xs">
+            <TextInput 
+                placeholder={placeholder}
+                leftSection={<SearchIcon size={14}/>} 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                w={250}
+            />
+            <Select 
+                data={sortOptions} 
+                value={sortBy} 
+                onChange={(v) => setSortBy(v || sortOptions[0].value)} 
+                allowDeselect={false}
+                leftSection={<SortAscIcon size={14}/>}
+                w={180}
+            />
+            <Select 
+                data={['5', '10', '25', '50']} 
+                value={itemsPerPage} 
+                onChange={(v) => setItemsPerPage(v || '10')}
+                w={70}
+                allowDeselect={false}
+            />
+        </Group>
+        <Button leftSection={<PlusIcon size={16}/>} onClick={onAdd}>{addLabel}</Button>
+    </Group>
+  );
+
   return (
     <MantineProvider theme={{}} forceColorScheme={colorScheme}>
       <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
@@ -279,11 +393,6 @@ const AdminDashboard: React.FC = () => {
                 <Title order={2}>Super Admin Console</Title>
                 <Text c="dimmed">System Management</Text>
               </div>
-              {activeTab === 'organizations' ? (
-                  <Button leftSection={<PlusIcon size={16}/>} onClick={() => openOrgModal('create')}>New Organization</Button>
-              ) : (
-                  <Button leftSection={<UserPlusIcon size={16}/>} onClick={() => openUserModal('create')}>Add User</Button>
-              )}
             </Group>
 
             <Paper shadow="sm" withBorder p="md">
@@ -344,7 +453,20 @@ const AdminDashboard: React.FC = () => {
               </Tabs.Panel>
 
               <Tabs.Panel value="organizations">
+                <TableControls 
+                    placeholder="Search organizations..." 
+                    addLabel="New Organization"
+                    onAdd={() => openOrgModal('create')}
+                    sortOptions={[
+                        { value: 'created_desc', label: 'Newest First' },
+                        { value: 'name_asc', label: 'Name (A-Z)' },
+                        { value: 'name_desc', label: 'Name (Z-A)' },
+                        { value: 'status', label: 'Status' }
+                    ]}
+                />
+                
                 {loading ? <Loader /> : (
+                  <>
                   <Table striped highlightOnHover>
                     <Table.Thead>
                         <Table.Tr>
@@ -355,7 +477,7 @@ const AdminDashboard: React.FC = () => {
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {orgList.map(org => (
+                        {processOrgs.data.map(org => (
                             <Table.Tr key={org.id} style={{ opacity: org.status === 'inactive' ? 0.6 : 1 }}>
                                 <Table.Td fw={700}>{org.name}</Table.Td>
                                 <Table.Td style={{ maxWidth: 300 }} className="truncate" title={org.description}>
@@ -376,11 +498,30 @@ const AdminDashboard: React.FC = () => {
                         ))}
                     </Table.Tbody>
                   </Table>
+                  {processOrgs.totalPages > 1 && (
+                      <Group justify="flex-end" mt="md">
+                          <Pagination total={processOrgs.totalPages} value={activePage} onChange={setActivePage} />
+                      </Group>
+                  )}
+                  </>
                 )}
               </Tabs.Panel>
 
               <Tabs.Panel value="all_users">
+                 <TableControls 
+                    placeholder="Search users, emails..." 
+                    addLabel="Add User"
+                    onAdd={() => openUserModal('create')}
+                    sortOptions={[
+                        { value: 'created_desc', label: 'Newest First' },
+                        { value: 'name_asc', label: 'Name (A-Z)' },
+                        { value: 'email', label: 'Email' },
+                        { value: 'role', label: 'Role' }
+                    ]}
+                 />
+
                  {loading ? <Loader /> : (
+                   <>
                    <Table striped highlightOnHover>
                     <Table.Thead>
                         <Table.Tr>
@@ -393,7 +534,7 @@ const AdminDashboard: React.FC = () => {
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {userList.map(u => (
+                        {processUsers.data.map(u => (
                             <Table.Tr key={u.id}>
                                 <Table.Td fw={500}>{u.username || 'N/A'}</Table.Td>
                                 <Table.Td>{u.email || 'N/A'}</Table.Td>
@@ -411,6 +552,12 @@ const AdminDashboard: React.FC = () => {
                         ))}
                     </Table.Tbody>
                   </Table>
+                  {processUsers.totalPages > 1 && (
+                      <Group justify="flex-end" mt="md">
+                          <Pagination total={processUsers.totalPages} value={activePage} onChange={setActivePage} />
+                      </Group>
+                  )}
+                  </>
                  )}
               </Tabs.Panel>
             </Tabs>

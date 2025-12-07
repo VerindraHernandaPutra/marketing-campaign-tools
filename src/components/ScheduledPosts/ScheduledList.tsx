@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Paper, Table, Badge, Group, ActionIcon, Menu, Text, Select, TextInput, Loader } from '@mantine/core';
-import { MoreVerticalIcon, EditIcon, TrashIcon, SearchIcon, CalendarIcon } from 'lucide-react';
+import { 
+  Paper, Group, Select, TextInput, Loader, SimpleGrid, 
+  Text, Box, SegmentedControl, Tooltip, Table, Badge, ActionIcon, Menu, Center
+} from '@mantine/core';
+import { 
+  SearchIcon, GridIcon, ListIcon, MoreVerticalIcon, 
+  EditIcon, TrashIcon, CalendarIcon 
+} from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
+import DesignCard from '../Dashboard/DesignCard';
 
 interface ScheduledPost {
   id: string;
@@ -12,6 +19,10 @@ interface ScheduledPost {
   scheduled_date: string;
   status: string;
   content: string;
+  platform_data?: {
+    media?: string[];
+  };
+  updated_at?: string;
 }
 
 const ScheduledList: React.FC = () => {
@@ -21,21 +32,18 @@ const ScheduledList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [platformFilter, setPlatformFilter] = useState<string | null>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // FIX: Wrap fetchPosts in useCallback
   const fetchPosts = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
-    // FIX: Use const for query as it is not reassigned
-    const query = supabase
+    const { data, error } = await supabase
       .from('marketing_campaigns')
       .select('*')
       .eq('user_id', user.id)
       .not('scheduled_date', 'is', null)
       .order('scheduled_date', { ascending: true });
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching scheduled posts:', error);
@@ -45,7 +53,6 @@ const ScheduledList: React.FC = () => {
     setLoading(false);
   }, [user]);
 
-  // FIX: Add fetchPosts to dependency array
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
@@ -85,102 +92,146 @@ const ScheduledList: React.FC = () => {
   });
 
   return (
-    <Paper shadow="sm" p="xl">
-      <Group justify="space-between" mb="md">
-        <TextInput 
-          placeholder="Search posts..." 
-          leftSection={<SearchIcon size={16} />} 
-          value={searchQuery} 
-          onChange={e => setSearchQuery(e.currentTarget.value)} 
-          w={300} 
-        />
-        <Select 
-          placeholder="Filter by platform" 
-          value={platformFilter} 
-          onChange={setPlatformFilter} 
-          data={[
-            { value: 'all', label: 'All Platforms' },
-            { value: 'facebook', label: 'Facebook' },
-            { value: 'instagram', label: 'Instagram' },
-            { value: 'twitter', label: 'Twitter' },
-            { value: 'email', label: 'Email' },
-            { value: 'whatsapp', label: 'WhatsApp' },
-            { value: 'linkedin', label: 'LinkedIn' }
-          ]} 
-          w={200} 
+    <Box>
+      <Group justify="space-between" mb="lg">
+        <Group>
+            <TextInput 
+            placeholder="Search scheduled posts..." 
+            leftSection={<SearchIcon size={16} />} 
+            value={searchQuery} 
+            onChange={e => setSearchQuery(e.currentTarget.value)} 
+            w={300} 
+            />
+            <Select 
+            placeholder="Filter by platform" 
+            value={platformFilter} 
+            onChange={setPlatformFilter} 
+            data={[
+                { value: 'all', label: 'All Platforms' },
+                { value: 'facebook', label: 'Facebook' },
+                { value: 'instagram', label: 'Instagram' },
+                { value: 'twitter', label: 'Twitter' },
+                { value: 'email', label: 'Email' },
+                { value: 'whatsapp', label: 'WhatsApp' },
+                { value: 'linkedin', label: 'LinkedIn' }
+            ]} 
+            w={200} 
+            />
+        </Group>
+
+        <SegmentedControl 
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'grid' | 'list')}
+            data={[
+                { label: <Tooltip label="Grid View"><GridIcon size={16}/></Tooltip>, value: 'grid' },
+                { label: <Tooltip label="List View"><ListIcon size={16}/></Tooltip>, value: 'list' },
+            ]}
         />
       </Group>
 
       {loading ? (
-        <Group justify="center" py="xl"><Loader /></Group>
+        <Center h={200}><Loader /></Center>
       ) : (
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Title</Table.Th>
-              <Table.Th>Platforms</Table.Th>
-              <Table.Th>Content Preview</Table.Th>
-              <Table.Th>Scheduled Date</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {filteredPosts.map(post => (
-              <Table.Tr key={post.id}>
-                <Table.Td fw={500}>{post.title}</Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    {post.platforms && post.platforms.map(p => (
-                        <Badge key={p} color={getPlatformColor(p)} variant="light" size="sm">
-                        {p}
-                        </Badge>
-                    ))}
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed" lineClamp={1}>
-                    {post.content}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <CalendarIcon size={14} />
-                    <Text size="sm">{new Date(post.scheduled_date).toLocaleString()}</Text>
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Badge color={getStatusColor(post.status)} variant="dot">
-                    {post.status?.toUpperCase()}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Menu shadow="md" width={200}>
-                    <Menu.Target>
-                      <ActionIcon variant="subtle">
-                        <MoreVerticalIcon size={16} />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item leftSection={<EditIcon size={14} />} onClick={() => navigate(`/campaign-manager/edit/${post.id}`)}>
-                        Edit
-                      </Menu.Item>
-                      <Menu.Divider />
-                      <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={() => handleDelete(post.id)}>
-                        Delete
-                      </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-            {filteredPosts.length === 0 && (
-                 <Table.Tr><Table.Td colSpan={6} align="center">No scheduled posts found</Table.Td></Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
+        <>
+          {filteredPosts.length === 0 ? (
+            <Text c="dimmed" ta="center" mt="xl">No scheduled posts found.</Text>
+          ) : (
+            viewMode === 'grid' ? (
+                // GRID VIEW
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
+                {filteredPosts.map(post => {
+                    const thumbnail = post.platform_data?.media?.[0] || null;
+                    const statusTag = post.status.charAt(0).toUpperCase() + post.status.slice(1);
+                    const platformTags = post.platforms.map(p => p.charAt(0).toUpperCase() + p.slice(1));
+                    const tags = [statusTag, ...platformTags];
+
+                    return (
+                    <DesignCard 
+                        key={post.id}
+                        design={{
+                        id: post.id,
+                        title: post.title,
+                        thumbnail: thumbnail,
+                        updated_at: post.scheduled_date,
+                        canvas_data: null,
+                        tags: tags
+                        }}
+                        isTemplate={false}
+                        onRefresh={fetchPosts}
+                    />
+                    );
+                })}
+                </SimpleGrid>
+            ) : (
+                // TABLE VIEW
+                <Paper shadow="sm" withBorder>
+                    <Table striped highlightOnHover verticalSpacing="sm">
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>Campaign Title</Table.Th>
+                                <Table.Th>Platforms</Table.Th>
+                                <Table.Th>Scheduled For</Table.Th>
+                                <Table.Th>Status</Table.Th>
+                                <Table.Th align="right">Actions</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {filteredPosts.map(post => (
+                                <Table.Tr key={post.id}>
+                                    <Table.Td>
+                                        <Text fw={500}>{post.title}</Text>
+                                        <Text size="xs" c="dimmed" lineClamp={1}>{post.content}</Text>
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Group gap="xs">
+                                            {post.platforms && post.platforms.map(p => (
+                                                <Badge key={p} color={getPlatformColor(p)} variant="light" size="sm">
+                                                {p}
+                                                </Badge>
+                                            ))}
+                                        </Group>
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Group gap="xs">
+                                            <CalendarIcon size={14} />
+                                            <Text size="sm">{new Date(post.scheduled_date).toLocaleString()}</Text>
+                                        </Group>
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Badge color={getStatusColor(post.status)} variant="dot">
+                                            {post.status?.toUpperCase()}
+                                        </Badge>
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Group justify="flex-end">
+                                            <Menu shadow="md" width={200}>
+                                                <Menu.Target>
+                                                    <ActionIcon variant="subtle" color="gray">
+                                                        <MoreVerticalIcon size={16} />
+                                                    </ActionIcon>
+                                                </Menu.Target>
+                                                <Menu.Dropdown>
+                                                    <Menu.Item leftSection={<EditIcon size={14} />} onClick={() => navigate(`/campaign-manager/edit/${post.id}`)}>
+                                                        Edit Campaign
+                                                    </Menu.Item>
+                                                    <Menu.Divider />
+                                                    <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={() => handleDelete(post.id)}>
+                                                        Delete
+                                                    </Menu.Item>
+                                                </Menu.Dropdown>
+                                            </Menu>
+                                        </Group>
+                                    </Table.Td>
+                                </Table.Tr>
+                            ))}
+                        </Table.Tbody>
+                    </Table>
+                </Paper>
+            )
+          )}
+        </>
       )}
-    </Paper>
+    </Box>
   );
 };
 
