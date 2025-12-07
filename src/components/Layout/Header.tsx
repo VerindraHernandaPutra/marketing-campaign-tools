@@ -100,7 +100,7 @@ const Header: React.FC<HeaderProps> = ({
             </ActionIcon>
           </Tooltip>
 
-          <Divider orientation="vertical" h={24} mx={4} />
+          <Divider orientation="vertical" h={50} mx={4} />
 
           {/* File Management Area */}
           <Box>
@@ -144,7 +144,7 @@ const Header: React.FC<HeaderProps> = ({
             </Group>
 
             {/* Sub-menu text links */}
-            <Group gap={2} mt={-2}>
+            <Group gap={2} mt={-2} mb={10}>
                <Menu shadow="md" width={200}>
                 <Menu.Target>
                   <Button variant="subtle" size="compact-xs" color="gray" fw={400} h={20}>File</Button>

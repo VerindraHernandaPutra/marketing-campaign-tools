@@ -300,12 +300,12 @@ const CanvaEditor: React.FC = () => {
     <CanvasContext.Provider value={contextValue}>
       <AppShell 
         styles={{ main: { padding: 0, height: 'calc(100vh - 60px)' } }} 
-        layout="alt" // This property ensures the header spans the full width at the top
+        layout=""
         navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !sidebarOpened } }} 
         aside={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedObject } }} 
         header={{ height: 60 }}
       >
-        <AppShell.Header>
+        <AppShell.Header zIndex={200}>
           <Header 
             projectTitle={projectTitle}
             onUpdateTitle={handleUpdateTitle}
