@@ -1,12 +1,17 @@
 // [cite: src/components/Layout/Sidebar.tsx]
 import React, { useState, useEffect, useRef } from 'react';
-import { ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, Divider, Box, MantineTheme, Button, Stack, Loader, Select, Textarea, SegmentedControl, Collapse, NumberInput, Paper, ActionIcon, Badge, Tooltip } from '@mantine/core';
+import { 
+  ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, 
+  Divider, Box, MantineTheme, Button, Stack, Loader, Select, Textarea, 
+  Collapse, NumberInput, Paper, ActionIcon, Badge, Tooltip, 
+  FileInput, CloseButton, Image as MantineImage, SegmentedControl 
+} from '@mantine/core';
 import { 
   ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, FileTextIcon, 
   BoxIcon, HexagonIcon, MinusIcon, BaselineIcon, SparklesIcon, 
   Settings2Icon, PaletteIcon, SunIcon, MaximizeIcon, ScalingIcon,
   MessageSquareIcon, ArrowRightIcon, ApertureIcon, ClockIcon, CloudRainIcon, PaintbrushIcon,
-  EyeIcon, CameraIcon
+  EyeIcon, CameraIcon, UploadIcon, RefreshCw
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
 import { useNotification } from '../../context/NotificationContext'; 
@@ -33,52 +38,35 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const { canvas } = useFabricCanvas();
   const notify = useNotification(); 
-  const scrollViewport = useRef<HTMLDivElement>(null);
+  
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // --- AI State ---
   const [mode, setMode] = useState<'classic' | 'chat'>('chat');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [currentPrompt, setCurrentPrompt] = useState('');
   
-  // --- Advanced AI Parameters ---
+  // --- Image Input State ---
+  const [aiImage, setAiImage] = useState<File | null>(null);
+  const [aiImagePreview, setAiImagePreview] = useState<string | null>(null);
+  
   const [aiParams, setAiParams] = useState({
-    // Base
     aspectRatio: 'square', 
     width: 1024,
     height: 1024,
     quality: 'standard',
-    
-    // Artistic
-    medium: '',       // e.g., Photography, Digital Art
-    style: '',        // e.g., Minimalist, Cyberpunk
-    colorPalette: '', // e.g., Vivid, Pastel
-    
-    // Photographic
-    camera: '',       // e.g., DSLR, Drone
-    lens: '',         // e.g., Wide Angle, Macro
-    perspective: '',  // e.g., Isometric, Bird's Eye
-    lighting: '',     // e.g., Studio, Neon
-    
-    // Environment
-    timeOfDay: '',    // e.g., Sunset, Midnight
-    weather: '',      // e.g., Clear, Foggy
-    
-    // Composition
-    composition: '',  // e.g., Rule of Thirds
-    complexity: '',   // e.g., Simple, Highly Detailed
-    
-    // Other
-    mood: '',
-    texture: '',
-    negativePrompt: ''
+    medium: '', style: '', colorPalette: '',
+    camera: '', lens: '', perspective: '', lighting: '',
+    timeOfDay: '', weather: '', mood: '', texture: '',
+    composition: '', complexity: '', negativePrompt: ''
   });
 
   // Auto-scroll chat
   useEffect(() => {
-    if (scrollViewport.current) {
-        scrollViewport.current.scrollTo({ top: scrollViewport.current.scrollHeight, behavior: 'smooth' });
+    if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [chatHistory, isGenerating]);
+  }, [chatHistory, isGenerating, activeTab]);
 
   // --- Helpers ---
   const addToCanvas = async (imageUrl: string) => {
@@ -146,33 +134,150 @@ const Sidebar: React.FC<SidebarProps> = () => {
     input.click();
   };
 
+  const handleImageUpload = (file: File | null) => {
+    setAiImage(file);
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => setAiImagePreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+    } else {
+        setAiImagePreview(null);
+    }
+  };
+
+  // --- 1. Resizes uploaded FILE objects ---
+  const resizeAndConvertImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const maxWidth = 800; 
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+          
+          const elem = document.createElement('canvas');
+          elem.width = width;
+          elem.height = height;
+          const ctx = elem.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(elem.toDataURL('image/jpeg', 0.8)); 
+          } else {
+            reject(new Error("Canvas context failed"));
+          }
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  // --- 2. Resizes existing Data URIs (from History) ---
+  const resizeDataURL = (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new window.Image();
+        img.src = dataUrl;
+        img.onload = () => {
+            const maxWidth = 800;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height *= maxWidth / width;
+                width = maxWidth;
+            }
+
+            const elem = document.createElement('canvas');
+            elem.width = width;
+            elem.height = height;
+            const ctx = elem.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                // Compress heavily to ensure it fits in payload (JPEG 70%)
+                resolve(elem.toDataURL('image/jpeg', 0.7)); 
+            } else {
+                // Fallback to original if canvas fails
+                resolve(dataUrl);
+            }
+        };
+        img.onerror = () => resolve(dataUrl); // Fallback on error
+    });
+  };
+
+  const clearChat = () => {
+      if(confirm('Clear conversation history?')) {
+          setChatHistory([]);
+          setAiImage(null);
+          setAiImagePreview(null);
+      }
+  }
+
   // --- AI GENERATION ---
   const handleGenerateAI = async () => {
-    if (!currentPrompt.trim()) return;
+    if (!currentPrompt.trim() && !aiImage) return;
     
     setIsGenerating(true);
-    const userMessage = currentPrompt;
+    const userMessage = currentPrompt || (aiImage ? 'Generate based on this image' : '');
     
-    // Contextual Prompt Logic
-    let finalSubject = userMessage;
-    if (mode === 'chat' && chatHistory.length > 0) {
-        const lastAiResponse = [...chatHistory].reverse().find(m => m.role === 'ai');
-        if (lastAiResponse && lastAiResponse.promptUsed) {
-            finalSubject = `${lastAiResponse.promptUsed}. Modification: ${userMessage}`;
+    // UI Update
+    setChatHistory(prev => [...prev, { 
+        id: Date.now().toString(), 
+        role: 'user', 
+        content: userMessage, 
+        timestamp: Date.now(),
+        imageUrl: aiImagePreview || undefined 
+    }]);
+    
+    // --- PREPARE CONTEXT IMAGE ---
+    let referenceImageBase64 = undefined;
+    
+    try {
+        if (aiImage) {
+            // Case A: User uploaded a new image
+            referenceImageBase64 = await resizeAndConvertImage(aiImage);
+        } else if (chatHistory.length > 0) {
+            // Case B: User is replying to previous AI output (Continuous)
+            const lastImageMsg = [...chatHistory].reverse().find(m => m.imageUrl);
+            if (lastImageMsg && lastImageMsg.imageUrl) {
+                // IMPORTANT: Must compress this history image too!
+                // DALL-E returns 1024x1024 PNGs which are massive.
+                referenceImageBase64 = await resizeDataURL(lastImageMsg.imageUrl);
+            }
         }
+    } catch (e) {
+        console.error("Image processing failed", e);
+        notify.error("Error", "Failed to process image context.");
+        setIsGenerating(false);
+        return;
     }
 
-    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMessage, timestamp: Date.now() }]);
     setCurrentPrompt('');
+    setAiImage(null);
+    setAiImagePreview(null);
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-image', {
             body: { 
-                params: { ...aiParams, subject: finalSubject } 
+                params: { 
+                    ...aiParams, 
+                    subject: currentPrompt || "A creative image",
+                    referenceImage: referenceImageBase64 
+                } 
             }
         });
 
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase Function Error:", error);
+            throw new Error(error.message || "Server error");
+        }
         
         if (data && data.image) {
             setChatHistory(prev => [
@@ -181,15 +286,18 @@ const Sidebar: React.FC<SidebarProps> = () => {
                     id: (Date.now() + 1).toString(), 
                     role: 'ai', 
                     imageUrl: data.image, 
-                    promptUsed: finalSubject,
+                    promptUsed: currentPrompt,
                     timestamp: Date.now() 
                 }
             ]);
+        } else if (data && data.error) {
+            throw new Error(data.error);
         }
     } catch (error: unknown) {
         console.error("AI Gen Error:", error);
         const msg = error instanceof Error ? error.message : "Unknown error";
         setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'ai', content: "Error: " + msg, timestamp: Date.now() }]);
+        notify.error("Generation Failed", msg);
     } finally {
         setIsGenerating(false);
     }
@@ -235,7 +343,8 @@ const Sidebar: React.FC<SidebarProps> = () => {
         <Divider mb="md" />
       </Box>
 
-      <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs" viewportRef={scrollViewport}>
+      {/* Main Content Area */}
+      <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs">
         {activeTab === 'elements' ? <Accordion multiple defaultValue={['ai']}>
             
             {/* AI IMAGE CREATOR */}
@@ -257,58 +366,133 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
                   {mode === 'chat' && (
                     <Box>
-                        {/* Chat Stream */}
-                        <Stack gap="md" mb="md">
-                            {chatHistory.length === 0 && (
-                                <Paper p="sm" bg="gray.0" className="dark:bg-dark-6">
-                                    <Text size="xs" c="dimmed" ta="center">
-                                        Describe your vision. Refine it with follow-ups.
+                        {/* Chat History Scroll Area - Fixed Height for Scrolling */}
+                        <ScrollArea 
+                            h={350} 
+                            viewportRef={chatScrollRef}
+                            type="auto"
+                            offsetScrollbars
+                            className="bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 mb-3"
+                        >
+                            <Stack gap="md">
+                                {chatHistory.length === 0 && (
+                                    <Text size="xs" c="dimmed" ta="center" mt="xl">
+                                        Describe your vision or upload a reference image to start.
                                     </Text>
-                                </Paper>
-                            )}
-                            {chatHistory.map((msg) => (
-                                <Box key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', marginLeft: msg.role === 'user' ? 'auto' : 0 }}>
-                                    {msg.role === 'user' ? (
-                                        <Paper p="xs" radius="md" bg="blue.1" className="dark:bg-blue-900">
-                                            <Text size="xs">{msg.content}</Text>
-                                        </Paper>
-                                    ) : (
-                                        <Stack gap={4}>
-                                            {msg.imageUrl ? (
-                                                <div className="relative group cursor-pointer" onClick={() => msg.imageUrl && addToCanvas(msg.imageUrl)}>
-                                                    <img src={msg.imageUrl} alt="AI" style={{ width: '100%', borderRadius: 8, border: '1px solid #eee' }} />
-                                                    <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" size="sm" color="dark">Click to Add</Badge>
-                                                </div>
-                                            ) : (
-                                                <Text size="xs" c="red">{msg.content}</Text>
-                                            )}
-                                        </Stack>
-                                    )}
-                                </Box>
-                            ))}
-                            {isGenerating && (
-                                <Group gap={4}>
-                                    <Loader size="xs" type="dots" />
-                                    <Text size="xs" c="dimmed">Creating...</Text>
-                                </Group>
-                            )}
-                        </Stack>
+                                )}
+                                {chatHistory.map((msg) => (
+                                    <Box key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', marginLeft: msg.role === 'user' ? 'auto' : 0 }}>
+                                        {msg.role === 'user' ? (
+                                            <Paper p="xs" radius="md" bg="blue.1" className="dark:bg-blue-900">
+                                                {msg.imageUrl && (
+                                                    <MantineImage 
+                                                        src={msg.imageUrl} 
+                                                        radius="sm" 
+                                                        h={100} 
+                                                        w="auto" 
+                                                        fit="contain" 
+                                                        mb={msg.content ? "xs" : 0} 
+                                                        bg="white"
+                                                    />
+                                                )}
+                                                {msg.content && <Text size="xs">{msg.content}</Text>}
+                                            </Paper>
+                                        ) : (
+                                            <Stack gap={4}>
+                                                {msg.imageUrl ? (
+                                                    <div className="relative group cursor-pointer" onClick={() => msg.imageUrl && addToCanvas(msg.imageUrl)}>
+                                                        <img src={msg.imageUrl} alt="AI" style={{ width: '100%', borderRadius: 8, border: '1px solid #eee' }} />
+                                                        <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" size="sm" color="dark">Click to Add</Badge>
+                                                    </div>
+                                                ) : (
+                                                    <Text size="xs" c="red">{msg.content}</Text>
+                                                )}
+                                            </Stack>
+                                        )}
+                                    </Box>
+                                ))}
+                                {isGenerating && (
+                                    <Group gap={4} justify="center" mt="xs">
+                                        <Loader size="xs" type="dots" />
+                                        <Text size="xs" c="dimmed">Generating...</Text>
+                                    </Group>
+                                )}
+                            </Stack>
+                        </ScrollArea>
 
-                        {/* Input */}
-                        <Group gap={4} align="flex-end">
-                            <Textarea 
-                                placeholder="Describe image..."
-                                autosize minRows={1} maxRows={4}
-                                value={currentPrompt}
-                                onChange={(e) => setCurrentPrompt(e.currentTarget.value)}
-                                onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateAI(); } }}
-                                style={{ flex: 1 }}
-                                size="xs"
+                        {/* Input Area Group */}
+                        <Box>
+                            {/* Image Preview if selected */}
+                            {aiImagePreview && (
+                                <Box pos="relative" mb="xs">
+                                    <MantineImage src={aiImagePreview} h={60} w="auto" radius="sm" fit="contain" bg="gray.1" style={{ border: '1px solid #ddd' }} />
+                                    <ActionIcon 
+                                        size="xs" color="red" variant="filled" radius="xl" 
+                                        pos="absolute" top={-5} right={-5}
+                                        onClick={() => handleImageUpload(null)}
+                                    >
+                                        <CloseButton size="xs" iconSize={12} />
+                                    </ActionIcon>
+                                </Box>
+                            )}
+
+                            {/* Main Input Row */}
+                            <Group align="flex-start" gap="xs" wrap="nowrap">
+                                <Stack gap={4} style={{ flex: 1 }}>
+                                    <Textarea 
+                                        placeholder={aiImage ? "Instructions..." : "Describe image..."}
+                                        autosize 
+                                        minRows={1} 
+                                        maxRows={3}
+                                        value={currentPrompt}
+                                        onChange={(e) => setCurrentPrompt(e.currentTarget.value)}
+                                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateAI(); } }}
+                                        size="sm"
+                                        radius="md"
+                                    />
+                                    {/* Toolbar Row */}
+                                    <Group justify="space-between">
+                                        <Group gap={4}>
+                                            <Tooltip label="Upload Reference Image">
+                                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => document.getElementById('chat-image-upload')?.click()}>
+                                                    <UploadIcon size={16} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                            {aiImage && <Text size="xs" c="dimmed" lineClamp={1} maw={100}>{aiImage.name}</Text>}
+                                        </Group>
+                                        
+                                        {chatHistory.length > 0 && (
+                                            <Tooltip label="Clear History">
+                                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={clearChat}>
+                                                    <RefreshCw size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        )}
+                                    </Group>
+                                </Stack>
+                                
+                                {/* Submit Button - Aligned to right */}
+                                <ActionIcon 
+                                    variant="default" 
+                                    size="xl" 
+                                    radius="md"
+                                    onClick={handleGenerateAI} 
+                                    disabled={isGenerating || (!currentPrompt.trim() && !aiImage)}
+                                    style={{ borderColor: theme.colors.gray[4] }}
+                                >
+                                    <ArrowRightIcon size={20} />
+                                </ActionIcon>
+                            </Group>
+
+                            {/* Hidden File Input */}
+                            <FileInput 
+                                accept="image/png,image/jpeg" 
+                                value={aiImage}
+                                onChange={handleImageUpload}
+                                display="none"
+                                id="chat-image-upload"
                             />
-                            <ActionIcon variant="filled" color="blue" size="lg" onClick={handleGenerateAI} disabled={isGenerating || !currentPrompt.trim()}>
-                                <ArrowRightIcon size={16} />
-                            </ActionIcon>
-                        </Group>
+                        </Box>
                     </Box>
                   )}
 
@@ -321,6 +505,18 @@ const Sidebar: React.FC<SidebarProps> = () => {
                             value={currentPrompt}
                             onChange={(e) => setCurrentPrompt(e.currentTarget.value)}
                         />
+                        <FileInput 
+                            label="Reference Image"
+                            placeholder="Upload an image to guide the AI"
+                            accept="image/png,image/jpeg"
+                            value={aiImage}
+                            onChange={handleImageUpload}
+                            leftSection={<UploadIcon size={14}/>}
+                            clearable
+                        />
+                        {aiImagePreview && (
+                            <MantineImage src={aiImagePreview} h={100} fit="contain" radius="sm" bg="gray.1" />
+                        )}
                         <Button onClick={handleGenerateAI} loading={isGenerating} fullWidth variant="gradient" gradient={{ from: 'indigo', to: 'cyan' }}>
                             Generate
                         </Button>
