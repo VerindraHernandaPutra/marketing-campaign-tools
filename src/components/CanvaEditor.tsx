@@ -39,23 +39,18 @@ const CanvaEditor: React.FC = () => {
   const notify = useNotification();
 
   // --- Optimized History State ---
-  // We use Refs for heavy history arrays to avoid re-rendering the component 
-  // every time a state is pushed (which was causing the lag).
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   
-  // We still need state for buttons to know if they should be enabled/disabled
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  // Lock to prevent recording history during undo/redo operations
   const isLocked = useRef(false);
 
   // --- 1. Save State Logic ---
   const saveState = useCallback(() => {
     if (!canvas || isLocked.current) return;
 
-    // Clear redo stack on new action
     redoStack.current = [];
     setCanRedo(false);
 
@@ -63,7 +58,6 @@ const CanvaEditor: React.FC = () => {
       const json = JSON.stringify(canvas.toJSON());
       undoStack.current.push(json);
       
-      // Limit stack size (e.g., 50)
       if (undoStack.current.length > 50) {
         undoStack.current.shift();
       }
@@ -78,7 +72,6 @@ const CanvaEditor: React.FC = () => {
   useEffect(() => {
     if (!canvas) return;
 
-    // Save initial state
     const initialState = JSON.stringify(canvas.toJSON());
     undoStack.current = [initialState];
     setCanUndo(true);
@@ -87,7 +80,6 @@ const CanvaEditor: React.FC = () => {
         saveState();
     };
 
-    // Fabric.js events
     canvas.on('object:added', handleModification);
     canvas.on('object:modified', handleModification);
     canvas.on('object:removed', handleModification);
@@ -103,23 +95,19 @@ const CanvaEditor: React.FC = () => {
   const handleUndo = useCallback(async () => {
     if (!canvas || undoStack.current.length <= 1) return;
 
-    // Lock history recording
     isLocked.current = true;
 
-    // Get current state and push to redo
     const currentState = undoStack.current.pop();
     if (currentState) {
       redoStack.current.push(currentState);
       setCanRedo(true);
     }
 
-    // Get previous state to load
     const prevState = undoStack.current[undoStack.current.length - 1];
 
     if (prevState) {
       try {
         await canvas.loadFromJSON(JSON.parse(prevState));
-        // Re-apply background logic if needed
         if (!canvas.backgroundColor || canvas.backgroundColor === 'transparent') {
             canvas.backgroundColor = '#ffffff';
         }
@@ -129,10 +117,8 @@ const CanvaEditor: React.FC = () => {
       }
     }
 
-    // Update button state
     setCanUndo(undoStack.current.length > 1);
     
-    // Unlock
     isLocked.current = false;
   }, [canvas]);
 
@@ -182,7 +168,7 @@ const CanvaEditor: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo]);
 
-  // --- Existing Data Fetching Logic ---
+  // --- Data Fetching ---
   useEffect(() => {
     if (!projectId) return;
     const fetchProject = async () => {
@@ -209,7 +195,6 @@ const CanvaEditor: React.FC = () => {
     fetchProject();
   }, [projectId, notify]);
 
-  // --- Save / Download / Resize Handlers (Kept same) ---
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
     
@@ -265,11 +250,10 @@ const CanvaEditor: React.FC = () => {
   const handleResize = (newDimensions: { width: number; height: number }) => {
     setDimensions(newDimensions);
     setIsResizeModalOpen(false);
-    if (canvas) saveState(); // Save state on resize
+    if (canvas) saveState(); 
     notify.show('Canvas Resized', `${newDimensions.width} x ${newDimensions.height} px`, 'info');
   };
 
-  // Zoom Helpers
   const handleZoomIn = () => {
     if (!canvas) return;
     const currentZoom = canvas.getZoom();
@@ -293,12 +277,11 @@ const CanvaEditor: React.FC = () => {
     const containerWidth = mainAreaRef.current.clientWidth;
     const containerHeight = mainAreaRef.current.clientHeight;
     
-    // Reset transform to calculate zoom correctly
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     
-    const scaleX = (containerWidth - 80) / dimensions.width; // 80px padding
+    const scaleX = (containerWidth - 80) / dimensions.width; 
     const scaleY = (containerHeight - 80) / dimensions.height;
-    const newZoom = Math.min(scaleX, scaleY, 1); // Don't zoom in past 100% automatically
+    const newZoom = Math.min(scaleX, scaleY, 1); 
 
     const panX = (containerWidth - dimensions.width * newZoom) / 2;
     const panY = (containerHeight - dimensions.height * newZoom) / 2;
@@ -317,6 +300,7 @@ const CanvaEditor: React.FC = () => {
     <CanvasContext.Provider value={contextValue}>
       <AppShell 
         styles={{ main: { padding: 0, height: 'calc(100vh - 60px)' } }} 
+        layout="alt" // This property ensures the header spans the full width at the top
         navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !sidebarOpened } }} 
         aside={{ width: 300, breakpoint: 'sm', collapsed: { mobile: true, desktop: !propertiesPanelOpened || !selectedObject } }} 
         header={{ height: 60 }}

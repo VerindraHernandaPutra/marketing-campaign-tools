@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Object as FabricObject } from 'fabric';
-import { Box, useMantineTheme } from '@mantine/core';
+import { Box, useMantineTheme, useMantineColorScheme } from '@mantine/core';
 
 interface CanvasProps {
   setCanvas: (canvas: FabricCanvas | null) => void;
@@ -21,6 +21,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [localCanvas, setLocalCanvas] = useState<FabricCanvas | null>(null);
   const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
 
   // Initialize Canvas
   useEffect(() => {
@@ -132,18 +133,15 @@ const Canvas: React.FC<CanvasProps> = ({
       style={{
         height: '100%',
         width: '100%',
-        display: 'flex', // Changed to flex for better centering behavior
+        display: 'flex', 
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: theme.colors.gray[1],
+        // Dynamic background based on color scheme, removing conflicts
+        backgroundColor: colorScheme === 'dark' ? theme.colors.dark[8] : theme.colors.gray[1],
         overflow: 'auto',
       }}
-      className="dark:bg-gray-900"
     >
-      {/* Key prop forces React to replace the element on re-mounts, 
-        clearing any debris left by Fabric's wrapper.
-        The style prop ensures it has dimensions even before Fabric initializes.
-      */}
+      {/* Key prop forces React to replace the element on re-mounts */}
       <canvas 
         ref={canvasRef} 
         key="fabric-canvas-element"

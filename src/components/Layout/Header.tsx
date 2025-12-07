@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Group, ActionIcon, Button, Divider, Menu, useMantineColorScheme, 
-  Box, TextInput, Tooltip
+  Box, TextInput, Tooltip, useMantineTheme
 } from '@mantine/core';
 import { 
   ArrowLeft, Download, Undo2, Redo2, Moon, Sun, Cloud, FileType, LayoutTemplate,
@@ -44,6 +44,7 @@ const Header: React.FC<HeaderProps> = ({
   canRedo = false
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const theme = useMantineTheme();
   const isDark = colorScheme === 'dark';
   const navigate = useNavigate();
   const [newTitle, setNewTitle] = useState(projectTitle);
@@ -78,7 +79,10 @@ const Header: React.FC<HeaderProps> = ({
       component="header" 
       h={64} 
       px="md" 
-      className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
+      style={{
+        borderBottom: `1px solid ${isDark ? theme.colors.dark[4] : theme.colors.gray[2]}`,
+        backgroundColor: isDark ? theme.colors.dark[7] : theme.white,
+      }}
     >
       <Group justify="space-between" h="100%" wrap="nowrap">
         

@@ -1,21 +1,22 @@
-// [cite: src/components/Layout/Sidebar.tsx]
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   ScrollArea, Accordion, Group, Text, UnstyledButton, SimpleGrid, useMantineTheme, 
   Divider, Box, MantineTheme, Button, Stack, Loader, Select, Textarea, 
   Collapse, NumberInput, Paper, ActionIcon, Badge, Tooltip, 
-  FileInput, CloseButton, Image as MantineImage, SegmentedControl 
+  FileInput, CloseButton, Image as MantineImage, SegmentedControl,
+  useMantineColorScheme
 } from '@mantine/core';
 import { 
   ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, FileTextIcon, 
   BoxIcon, HexagonIcon, MinusIcon, BaselineIcon, SparklesIcon, 
   Settings2Icon, PaletteIcon, SunIcon, MaximizeIcon, ScalingIcon,
   MessageSquareIcon, ArrowRightIcon, ApertureIcon, ClockIcon, CloudRainIcon, PaintbrushIcon,
-  EyeIcon, CameraIcon, UploadIcon, RefreshCw
+  EyeIcon, CameraIcon, UploadIcon, RefreshCw, LayersIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon, EyeOffIcon, LockIcon, UnlockIcon,
+  Shapes
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
 import { useNotification } from '../../context/NotificationContext'; 
-import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline, Image as FabricImage } from 'fabric';
+import { Rect, Circle, Triangle, Line, Textbox, Ellipse, Polygon, Polyline, Image as FabricImage, Object as FabricObject } from 'fabric';
 import { supabase } from '../../supabaseClient';
 
 interface SidebarProps {
@@ -34,12 +35,18 @@ type ChatMessage = {
 
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
-  const [activeTab, setActiveTab] = useState<string | null>('elements');
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const [activeTab, setActiveTab] = useState<string | null>('layers');
   const [isGenerating, setIsGenerating] = useState(false);
-  const { canvas } = useFabricCanvas();
+  const { canvas, selectedObject } = useFabricCanvas();
   const notify = useNotification(); 
   
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // --- Layers State ---
+  const [layers, setLayers] = useState<FabricObject[]>([]);
 
   // --- AI State ---
   const [mode, setMode] = useState<'classic' | 'chat'>('chat');
@@ -61,14 +68,114 @@ const Sidebar: React.FC<SidebarProps> = () => {
     composition: '', complexity: '', negativePrompt: ''
   });
 
-  // Auto-scroll chat
+  const syncLayers = useCallback(() => {
+    if (canvas) {
+      setLayers([...canvas.getObjects()].reverse());
+    }
+  }, [canvas]);
+
+  useEffect(() => {
+    if (!canvas) return;
+    syncLayers();
+    const handleMutation = () => syncLayers();
+
+    canvas.on('object:added', handleMutation);
+    canvas.on('object:removed', handleMutation);
+    canvas.on('object:modified', handleMutation);
+    canvas.on('selection:created', handleMutation); 
+    canvas.on('selection:updated', handleMutation);
+    canvas.on('selection:cleared', handleMutation);
+
+    return () => {
+      canvas.off('object:added', handleMutation);
+      canvas.off('object:removed', handleMutation);
+      canvas.off('object:modified', handleMutation);
+      canvas.off('selection:created', handleMutation);
+      canvas.off('selection:updated', handleMutation);
+      canvas.off('selection:cleared', handleMutation);
+    };
+  }, [canvas, syncLayers]);
+
+  const selectLayer = (obj: FabricObject) => {
+    if (!canvas) return;
+    canvas.setActiveObject(obj);
+    canvas.renderAll();
+  };
+
+  const deleteLayer = (e: React.MouseEvent, obj: FabricObject) => {
+    e.stopPropagation();
+    if (!canvas) return;
+    canvas.remove(obj);
+    canvas.discardActiveObject();
+    canvas.renderAll();
+  };
+
+  const moveLayer = (e: React.MouseEvent, obj: FabricObject, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    if (!canvas) return;
+    if (direction === 'up') obj.bringForward();
+    else obj.sendBackwards();
+    canvas.renderAll();
+    syncLayers();
+  };
+
+  const toggleVisibility = (e: React.MouseEvent, obj: FabricObject) => {
+    e.stopPropagation();
+    if (!canvas) return;
+    obj.set('visible', !obj.visible);
+    if (!obj.visible) {
+      canvas.discardActiveObject();
+    }
+    canvas.renderAll();
+    syncLayers();
+  };
+
+  const toggleLock = (e: React.MouseEvent, obj: FabricObject) => {
+    e.stopPropagation();
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isLocked = !(obj as any).lockMovementX;
+    obj.set({
+      lockMovementX: isLocked,
+      lockMovementY: isLocked,
+      lockRotation: isLocked,
+      lockScalingX: isLocked,
+      lockScalingY: isLocked,
+      selectable: !isLocked, 
+      evented: !isLocked
+    });
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    syncLayers();
+  };
+
+  const getLayerIcon = (type: string | undefined) => {
+    switch(type) {
+      case 'i-text':
+      case 'textbox': return <TypeIcon size={14} />;
+      case 'image': return <ImageIcon size={14} />;
+      case 'rect': return <SquareIcon size={14} />;
+      case 'circle': return <CircleIcon size={14} />;
+      case 'triangle': return <TriangleIcon size={14} />;
+      case 'line': return <MinusIcon size={14} />;
+      default: return <BoxIcon size={14} />;
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getLayerName = (obj: any) => {
+    if (obj.type === 'textbox' || obj.type === 'i-text') {
+      return obj.text ? `Text: "${obj.text.substring(0, 10)}${obj.text.length > 10 ? '...' : ''}"` : 'Text Layer';
+    }
+    return obj.type ? obj.type.charAt(0).toUpperCase() + obj.type.slice(1) : 'Layer';
+  };
+
   useEffect(() => {
     if (chatScrollRef.current) {
         chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [chatHistory, isGenerating, activeTab]);
 
-  // --- Helpers ---
   const addToCanvas = async (imageUrl: string) => {
     if (!canvas) return;
     try {
@@ -145,7 +252,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
     }
   };
 
-  // --- 1. Resizes uploaded FILE objects ---
   const resizeAndConvertImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -180,7 +286,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
     });
   };
 
-  // --- 2. Resizes existing Data URIs (from History) ---
   const resizeDataURL = (dataUrl: string): Promise<string> => {
     return new Promise((resolve) => {
         const img = new window.Image();
@@ -201,14 +306,12 @@ const Sidebar: React.FC<SidebarProps> = () => {
             const ctx = elem.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0, width, height);
-                // Compress heavily to ensure it fits in payload (JPEG 70%)
                 resolve(elem.toDataURL('image/jpeg', 0.7)); 
             } else {
-                // Fallback to original if canvas fails
                 resolve(dataUrl);
             }
         };
-        img.onerror = () => resolve(dataUrl); // Fallback on error
+        img.onerror = () => resolve(dataUrl); 
     });
   };
 
@@ -220,14 +323,12 @@ const Sidebar: React.FC<SidebarProps> = () => {
       }
   }
 
-  // --- AI GENERATION ---
   const handleGenerateAI = async () => {
     if (!currentPrompt.trim() && !aiImage) return;
     
     setIsGenerating(true);
     const userMessage = currentPrompt || (aiImage ? 'Generate based on this image' : '');
     
-    // UI Update
     setChatHistory(prev => [...prev, { 
         id: Date.now().toString(), 
         role: 'user', 
@@ -236,19 +337,14 @@ const Sidebar: React.FC<SidebarProps> = () => {
         imageUrl: aiImagePreview || undefined 
     }]);
     
-    // --- PREPARE CONTEXT IMAGE ---
     let referenceImageBase64 = undefined;
     
     try {
         if (aiImage) {
-            // Case A: User uploaded a new image
             referenceImageBase64 = await resizeAndConvertImage(aiImage);
         } else if (chatHistory.length > 0) {
-            // Case B: User is replying to previous AI output (Continuous)
             const lastImageMsg = [...chatHistory].reverse().find(m => m.imageUrl);
             if (lastImageMsg && lastImageMsg.imageUrl) {
-                // IMPORTANT: Must compress this history image too!
-                // DALL-E returns 1024x1024 PNGs which are massive.
                 referenceImageBase64 = await resizeDataURL(lastImageMsg.imageUrl);
             }
         }
@@ -323,31 +419,116 @@ const Sidebar: React.FC<SidebarProps> = () => {
         <Group justify="center" mb="md">
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
-            style={{ padding: 8, borderRadius: 8, flex: 1, textAlign: 'center', 
-                     color: activeTab === 'templates' ? theme.colors.blue[6] : 'inherit',
-                     backgroundColor: activeTab === 'templates' ? theme.colors.gray[1] : 'transparent' }} 
-            onClick={() => setActiveTab('templates')}
+            style={{ 
+                padding: 8, 
+                borderRadius: 8, 
+                flex: 1, 
+                textAlign: 'center', 
+                color: activeTab === 'layers' 
+                    ? (isDark ? theme.white : theme.colors.blue[6]) 
+                    : 'inherit',
+                backgroundColor: activeTab === 'layers' 
+                    ? (isDark ? theme.colors.dark[6] : theme.colors.gray[1]) 
+                    : 'transparent' 
+            }} 
+            onClick={() => setActiveTab('layers')}
           >
-            <Text size="sm" fw={500}>Templates</Text>
+            <Group gap={4} justify="center">
+                <LayersIcon size={16} />
+                <Text size="sm" fw={500}>Layers</Text>
+            </Group>
           </UnstyledButton>
           <UnstyledButton 
             className="hover:bg-gray-0 dark:hover:bg-dark-6"
-            style={{ padding: 8, borderRadius: 8, flex: 1, textAlign: 'center',
-                     color: activeTab === 'elements' ? theme.colors.blue[6] : 'inherit',
-                     backgroundColor: activeTab === 'elements' ? theme.colors.gray[1] : 'transparent' }} 
+            style={{ 
+                padding: 8, 
+                borderRadius: 8, 
+                flex: 1, 
+                textAlign: 'center',
+                color: activeTab === 'elements' 
+                    ? (isDark ? theme.white : theme.colors.blue[6]) 
+                    : 'inherit',
+                backgroundColor: activeTab === 'elements' 
+                    ? (isDark ? theme.colors.dark[6] : theme.colors.gray[1]) 
+                    : 'transparent' 
+            }} 
             onClick={() => setActiveTab('elements')}
           >
-            <Text size="sm" fw={500}>Elements</Text>
+            <Group gap={4} justify="center">
+                <Shapes size={16} />
+                <Text size="sm" fw={500}>Elements</Text>
+            </Group>
           </UnstyledButton>
         </Group>
         <Divider mb="md" />
       </Box>
 
-      {/* Main Content Area */}
       <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs">
-        {activeTab === 'elements' ? <Accordion multiple defaultValue={['ai']}>
+        
+        {activeTab === 'layers' && (
+            <Stack gap="xs">
+                {layers.length === 0 ? (
+                    <Text c="dimmed" ta="center" mt="xl" size="sm">Canvas is empty.</Text>
+                ) : (
+                    layers.map((obj, index) => {
+                        const isActive = selectedObject === obj;
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const isLocked = (obj as any).lockMovementX; 
+
+                        return (
+                            <Paper 
+                                key={index} 
+                                withBorder 
+                                p={8} 
+                                radius="sm"
+                                bg={isActive 
+                                    ? (isDark ? theme.colors.blue[9] : 'blue.0') 
+                                    : 'transparent'}
+                                style={{ 
+                                    cursor: 'pointer',
+                                    borderColor: isActive ? theme.colors.blue[4] : undefined
+                                }}
+                                onClick={() => selectLayer(obj)}
+                            >
+                                <Group justify="space-between" wrap="nowrap">
+                                    <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }}>
+                                        <div style={{ opacity: 0.7 }}>{getLayerIcon(obj.type)}</div>
+                                        <Text size="sm" truncate>
+                                            {getLayerName(obj)}
+                                        </Text>
+                                    </Group>
+
+                                    <Group gap={2}>
+                                        <ActionIcon size="sm" variant="subtle" color="gray" onClick={(e) => toggleVisibility(e, obj)}>
+                                            {obj.visible ? <EyeIcon size={12} /> : <EyeOffIcon size={12} />}
+                                        </ActionIcon>
+                                        <ActionIcon size="sm" variant="subtle" color="gray" onClick={(e) => toggleLock(e, obj)}>
+                                            {isLocked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+                                        </ActionIcon>
+                                        
+                                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={(e) => moveLayer(e, obj, 'up')}>
+                                            <ChevronUpIcon size={12} />
+                                        </ActionIcon>
+                                        
+                                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={(e) => moveLayer(e, obj, 'down')}>
+                                            <ChevronDownIcon size={12} />
+                                        </ActionIcon>
+
+                                        <ActionIcon size="sm" variant="subtle" color="red" onClick={(e) => deleteLayer(e, obj)}>
+                                            <TrashIcon size={12} />
+                                        </ActionIcon>
+                                    </Group>
+                                </Group>
+                            </Paper>
+                        );
+                    })
+                )}
+            </Stack>
+        )}
+
+        {activeTab === 'elements' && (
+          <Accordion multiple defaultValue={['ai']}>
             
-            {/* AI IMAGE CREATOR */}
             <Accordion.Item value="ai">
               <Accordion.Control icon={<SparklesIcon size={18} color={theme.colors.blue[6]} />}>
                 <Text fw={600}>AI Image Creator</Text>
@@ -366,13 +547,19 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
                   {mode === 'chat' && (
                     <Box>
-                        {/* Chat History Scroll Area - Fixed Height for Scrolling */}
+                        {/* DARK MODE ADJUSTMENT: Chat History Area */}
                         <ScrollArea 
                             h={350} 
                             viewportRef={chatScrollRef}
                             type="auto"
                             offsetScrollbars
-                            className="bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 mb-3"
+                            bg={isDark ? theme.colors.dark[7] : theme.colors.gray[0]} // Explicit theme colors
+                            p="xs"
+                            mb="sm"
+                            style={{ 
+                                borderRadius: theme.radius.md,
+                                border: `1px solid ${isDark ? theme.colors.dark[4] : theme.colors.gray[3]}`
+                            }}
                         >
                             <Stack gap="md">
                                 {chatHistory.length === 0 && (
@@ -383,7 +570,14 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                 {chatHistory.map((msg) => (
                                     <Box key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', marginLeft: msg.role === 'user' ? 'auto' : 0 }}>
                                         {msg.role === 'user' ? (
-                                            <Paper p="xs" radius="md" bg="blue.1" className="dark:bg-blue-900">
+                                            <Paper 
+                                                p="xs" 
+                                                radius="md" 
+                                                bg={isDark ? theme.colors.blue[9] : theme.colors.blue[1]}
+                                                style={{
+                                                    color: isDark ? theme.white : theme.black
+                                                }}
+                                            >
                                                 {msg.imageUrl && (
                                                     <MantineImage 
                                                         src={msg.imageUrl} 
@@ -420,9 +614,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
                             </Stack>
                         </ScrollArea>
 
-                        {/* Input Area Group */}
                         <Box>
-                            {/* Image Preview if selected */}
                             {aiImagePreview && (
                                 <Box pos="relative" mb="xs">
                                     <MantineImage src={aiImagePreview} h={60} w="auto" radius="sm" fit="contain" bg="gray.1" style={{ border: '1px solid #ddd' }} />
@@ -436,9 +628,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                 </Box>
                             )}
 
-                            {/* Main Input Row */}
                             <Group align="flex-start" gap="xs" wrap="nowrap">
                                 <Stack gap={4} style={{ flex: 1 }}>
+                                    {/* DARK MODE ADJUSTMENT: Input Field */}
                                     <Textarea 
                                         placeholder={aiImage ? "Instructions..." : "Describe image..."}
                                         autosize 
@@ -449,8 +641,14 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                         onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateAI(); } }}
                                         size="sm"
                                         radius="md"
+                                        styles={{
+                                            input: {
+                                                backgroundColor: isDark ? theme.colors.dark[6] : theme.white,
+                                                color: isDark ? theme.white : theme.black,
+                                                borderColor: isDark ? theme.colors.dark[4] : theme.colors.gray[4]
+                                            }
+                                        }}
                                     />
-                                    {/* Toolbar Row */}
                                     <Group justify="space-between">
                                         <Group gap={4}>
                                             <Tooltip label="Upload Reference Image">
@@ -471,7 +669,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     </Group>
                                 </Stack>
                                 
-                                {/* Submit Button - Aligned to right */}
                                 <ActionIcon 
                                     variant="default" 
                                     size="xl" 
@@ -484,7 +681,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                 </ActionIcon>
                             </Group>
 
-                            {/* Hidden File Input */}
                             <FileInput 
                                 accept="image/png,image/jpeg" 
                                 value={aiImage}
@@ -523,13 +719,11 @@ const Sidebar: React.FC<SidebarProps> = () => {
                     </Stack>
                   )}
 
-                  {/* --- ADVANCED SETTINGS --- */}
                   <Accordion variant="separated" radius="md" chevronPosition="left" styles={{ label: { fontSize: 12, fontWeight: 600 }, control: { height: 36 } }} mt="sm">
                     <Accordion.Item value="settings">
                         <Accordion.Control>Advanced Controls</Accordion.Control>
                         <Accordion.Panel>
                             <Stack gap="xs">
-                                {/* 1. Technical & Size */}
                                 <Divider label="Format" labelPosition="left" />
                                 <SimpleGrid cols={2}>
                                     <Select 
@@ -547,7 +741,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     />
                                 </SimpleGrid>
                                 
-                                {/* CUSTOM SIZE INPUTS */}
                                 <Collapse in={aiParams.aspectRatio === 'custom'}>
                                     <SimpleGrid cols={2} mt="xs">
                                         <NumberInput
@@ -565,7 +758,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     </SimpleGrid>
                                 </Collapse>
 
-                                {/* 2. Artistic & Medium */}
                                 <Divider label="Art Style" labelPosition="left" mt="xs" />
                                 <Select 
                                     label="Medium" placeholder="Any" size="xs"
@@ -588,7 +780,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     clearable
                                 />
 
-                                {/* 3. Photography & View */}
                                 <Divider label="Camera & View" labelPosition="left" mt="xs" />
                                 <SimpleGrid cols={2}>
                                     <Tooltip label="Camera Perspective/Angle">
@@ -619,7 +810,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     mt="xs"
                                 />
 
-                                {/* 4. Environment */}
                                 <Divider label="Environment" labelPosition="left" mt="xs" />
                                 <SimpleGrid cols={2}>
                                     <Select 
@@ -651,7 +841,6 @@ const Sidebar: React.FC<SidebarProps> = () => {
               </Accordion.Panel>
             </Accordion.Item>
 
-            {/* Shapes, Text, etc. */}
             <Accordion.Item value="shapes">
               <Accordion.Control>Shapes</Accordion.Control>
               <Accordion.Panel>
@@ -688,9 +877,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
             </Accordion.Item>
 
           </Accordion> 
-          : 
-          <Text c="dimmed" ta="center" mt="xl">No templates available</Text>
-        }
+        )}
       </ScrollArea>
     </Box>
   );
