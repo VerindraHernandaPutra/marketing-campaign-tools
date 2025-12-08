@@ -2,9 +2,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Container, Title, Button, Table, Group, TextInput, Modal, ActionIcon, 
-  LoadingOverlay, Paper, Drawer, MultiSelect, Text, Select, Pagination, Stack
+  LoadingOverlay, Paper, Drawer, Text, Select, Pagination, Stack, 
+  Checkbox, ScrollArea, Avatar, Badge, Divider, Center, ThemeIcon, Box
 } from '@mantine/core';
-import { PlusIcon, EditIcon, TrashIcon, UsersIcon, SearchIcon, SortAscIcon } from 'lucide-react';
+import { 
+  PlusIcon, EditIcon, TrashIcon, UsersIcon, SearchIcon, SortAscIcon, 
+  ArrowRightIcon, ArrowLeftIcon, CheckIcon, UserIcon
+} from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
@@ -16,6 +20,13 @@ interface MarketingGroup {
   description: string;
   client_count?: number;
   created_at?: string;
+}
+
+interface Client {
+    id: string;
+    name: string;
+    email?: string;
+    avatar_url?: string;
 }
 
 // Define a type for the raw response to avoid 'any'
@@ -44,11 +55,20 @@ const Groups: React.FC = () => {
   const [groupName, setGroupName] = useState('');
   const [groupDesc, setGroupDesc] = useState('');
 
-  // Manage Members State
+  // -- Advanced Member Management State --
   const [manageOpen, setManageOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [allClients, setAllClients] = useState<{value: string, label: string}[]>([]);
-  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+  const [selectedGroupName, setSelectedGroupName] = useState<string>('');
+  
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [memberIds, setMemberIds] = useState<Set<string>>(new Set()); // IDs currently in the group
+  
+  // Selection states for the transfer lists
+  const [leftSelection, setLeftSelection] = useState<string[]>([]);
+  const [rightSelection, setRightSelection] = useState<string[]>([]);
+  const [leftSearch, setLeftSearch] = useState('');
+  const [rightSearch, setRightSearch] = useState('');
+  const [isSavingMembers, setIsSavingMembers] = useState(false);
 
   // Reset pagination
   useEffect(() => {
@@ -86,7 +106,6 @@ const Groups: React.FC = () => {
   const processedGroups = useMemo(() => {
     let data = [...groups];
 
-    // 1. Search
     if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         data = data.filter(g => 
@@ -95,7 +114,6 @@ const Groups: React.FC = () => {
         );
     }
 
-    // 2. Sort
     data.sort((a, b) => {
         switch (sortBy) {
             case 'name_asc': return a.name.localeCompare(b.name);
@@ -106,7 +124,6 @@ const Groups: React.FC = () => {
         }
     });
 
-    // 3. Paginate
     const total = data.length;
     const limit = parseInt(itemsPerPage);
     const totalPages = Math.ceil(total / limit);
@@ -141,39 +158,150 @@ const Groups: React.FC = () => {
     fetchGroups();
   };
 
+  // --- Advanced Member Management Logic ---
+
   const openManageMembers = async (group: MarketingGroup) => {
     setSelectedGroupId(group.id);
+    setSelectedGroupName(group.name);
+    setLeftSelection([]);
+    setRightSelection([]);
+    setLeftSearch('');
+    setRightSearch('');
     setManageOpen(true);
     
-    const { data: clients } = await supabase.from('clients').select('id, name').eq('user_id', user!.id);
-    setAllClients(clients?.map(c => ({ value: c.id, label: c.name })) || []);
+    // Fetch all clients
+    const { data: clients } = await supabase.from('clients').select('id, name, email').eq('user_id', user!.id);
+    setAllClients(clients as Client[] || []);
 
+    // Fetch current members
     const { data: members } = await supabase
       .from('client_groups')
       .select('client_id')
       .eq('group_id', group.id);
     
-    setGroupMembers(members?.map(m => m.client_id) || []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const memberIdSet = new Set(members?.map((m: any) => m.client_id) || []);
+    setMemberIds(memberIdSet as Set<string>);
   };
 
   const saveMembers = async () => {
     if (!selectedGroupId) return;
-    setLoading(true);
+    setIsSavingMembers(true);
 
-    await supabase.from('client_groups').delete().eq('group_id', selectedGroupId);
+    try {
+        // Delete all existing links for this group
+        await supabase.from('client_groups').delete().eq('group_id', selectedGroupId);
 
-    if (groupMembers.length > 0) {
-      const toInsert = groupMembers.map(clientId => ({
-        group_id: selectedGroupId,
-        client_id: clientId
-      }));
-      await supabase.from('client_groups').insert(toInsert);
+        // Insert new links from the memberIds set
+        if (memberIds.size > 0) {
+            const toInsert = Array.from(memberIds).map(clientId => ({
+                group_id: selectedGroupId,
+                client_id: clientId
+            }));
+            const { error } = await supabase.from('client_groups').insert(toInsert);
+            if (error) throw error;
+        }
+
+        setManageOpen(false);
+        fetchGroups(); // Update counts in the main table
+    } catch (error) {
+        console.error("Failed to save members", error);
+        alert("Failed to save group members.");
+    } finally {
+        setIsSavingMembers(false);
     }
-
-    setLoading(false);
-    setManageOpen(false);
-    fetchGroups();
   };
+
+  const moveRight = () => {
+      const newMemberIds = new Set(memberIds);
+      leftSelection.forEach(id => newMemberIds.add(id));
+      setMemberIds(newMemberIds);
+      setLeftSelection([]);
+  };
+
+  const moveLeft = () => {
+      const newMemberIds = new Set(memberIds);
+      rightSelection.forEach(id => newMemberIds.delete(id));
+      setMemberIds(newMemberIds);
+      setRightSelection([]);
+  };
+
+  const toggleLeftSelection = (id: string) => {
+      setLeftSelection(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleRightSelection = (id: string) => {
+      setRightSelection(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  // Filter lists based on search and membership status
+  const leftList = allClients.filter(c => !memberIds.has(c.id) && c.name.toLowerCase().includes(leftSearch.toLowerCase()));
+  const rightList = allClients.filter(c => memberIds.has(c.id) && c.name.toLowerCase().includes(rightSearch.toLowerCase()));
+
+  const CustomList = ({ 
+      items, 
+      selection, 
+      onToggle, 
+      placeholder, 
+      searchValue, 
+      onSearchChange,
+      emptyLabel
+  }: { 
+      items: Client[], 
+      selection: string[], 
+      onToggle: (id: string) => void, 
+      placeholder: string,
+      searchValue: string,
+      onSearchChange: (val: string) => void,
+      emptyLabel: string
+  }) => (
+      <Paper withBorder h="100%" display="flex" style={{ flexDirection: 'column', overflow: 'hidden' }}>
+          <Box p="xs" className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+             <TextInput 
+                placeholder={placeholder} 
+                size="xs" 
+                leftSection={<SearchIcon size={12}/>}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.currentTarget.value)}
+             />
+             <Group justify="space-between" mt="xs">
+                <Text size="xs" c="dimmed">{items.length} items</Text>
+                <Text size="xs" c="dimmed">{selection.length} selected</Text>
+             </Group>
+          </Box>
+          <ScrollArea flex={1} bg="white dark:bg-gray-900">
+              {items.length === 0 ? (
+                  <Center h={100}>
+                      <Text size="xs" c="dimmed">{emptyLabel}</Text>
+                  </Center>
+              ) : (
+                  <Stack gap={0}>
+                      {items.map(client => {
+                          const isSelected = selection.includes(client.id);
+                          return (
+                              <Group 
+                                  key={client.id} 
+                                  p="xs" 
+                                  wrap="nowrap"
+                                  className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-100 dark:border-gray-800 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                                  onClick={() => onToggle(client.id)}
+                              >
+                                  <Checkbox checked={isSelected} readOnly size="xs" style={{ pointerEvents: 'none' }} />
+                                  <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                                      <Avatar size="sm" radius="xl" color="blue"><UserIcon size={14}/></Avatar>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                          <Text size="sm" fw={500} truncate>{client.name}</Text>
+                                          {client.email && <Text size="xs" c="dimmed" truncate>{client.email}</Text>}
+                                      </div>
+                                  </Group>
+                              </Group>
+                          );
+                      })}
+                  </Stack>
+              )}
+          </ScrollArea>
+      </Paper>
+  );
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
@@ -295,22 +423,88 @@ const Groups: React.FC = () => {
         </Stack>
       </Modal>
 
-      {/* Manage Members Drawer */}
-      <Drawer opened={manageOpen} onClose={() => setManageOpen(false)} title="Manage Group Members" position="right" size="md">
-        <Text size="sm" mb="md" c="dimmed">Select clients to include in this group.</Text>
-        <Stack h="calc(100vh - 150px)">
-            <MultiSelect
-            label="Select Clients"
-            placeholder="Pick clients"
-            data={allClients}
-            value={groupMembers}
-            onChange={setGroupMembers}
-            searchable
-            nothingFoundMessage="No clients found"
-            maxDropdownHeight={300}
-            />
-            <div style={{ flex: 1 }}></div>
-            <Button fullWidth onClick={saveMembers}>Save Members</Button>
+      {/* Advanced Manage Members Drawer */}
+      <Drawer 
+        opened={manageOpen} 
+        onClose={() => setManageOpen(false)} 
+        title={
+            <Group>
+                <ThemeIcon variant="light" color="blue" size="lg"><UsersIcon size={20}/></ThemeIcon>
+                <Box>
+                    <Text fw={700}>Manage Members</Text>
+                    <Text size="xs" c="dimmed">Group: {selectedGroupName}</Text>
+                </Box>
+            </Group>
+        } 
+        position="right" 
+        size="xl" // Wide drawer for split view
+        overlayProps={{ backgroundOpacity: 0.5, blur: 4 }}
+      >
+        <Stack h="calc(100vh - 100px)" gap="md">
+            
+            <Group grow align="stretch" style={{ flex: 1, minHeight: 0 }}>
+                {/* LEFT PANEL: Available Clients */}
+                <Stack gap="xs" h="100%">
+                    <Text size="sm" fw={600}>Available Clients</Text>
+                    <CustomList 
+                        items={leftList} 
+                        selection={leftSelection} 
+                        onToggle={toggleLeftSelection} 
+                        placeholder="Search available..."
+                        searchValue={leftSearch}
+                        onSearchChange={setLeftSearch}
+                        emptyLabel="No available clients found"
+                    />
+                </Stack>
+
+                {/* MIDDLE: Action Buttons */}
+                <Stack justify="center" gap="sm" w={50} style={{ flexGrow: 0 }}>
+                    <ActionIcon 
+                        variant="filled" color="blue" size="lg" radius="xl" 
+                        onClick={moveRight} 
+                        disabled={leftSelection.length === 0}
+                    >
+                        <ArrowRightIcon size={20} />
+                    </ActionIcon>
+                    <ActionIcon 
+                        variant="filled" color="gray" size="lg" radius="xl" 
+                        onClick={moveLeft} 
+                        disabled={rightSelection.length === 0}
+                    >
+                        <ArrowLeftIcon size={20} />
+                    </ActionIcon>
+                </Stack>
+
+                {/* RIGHT PANEL: Group Members */}
+                <Stack gap="xs" h="100%">
+                    <Group justify="space-between">
+                        <Text size="sm" fw={600}>Assigned Members</Text>
+                        <Badge variant="light" color="blue">{memberIds.size}</Badge>
+                    </Group>
+                    <CustomList 
+                        items={rightList} 
+                        selection={rightSelection} 
+                        onToggle={toggleRightSelection} 
+                        placeholder="Search members..."
+                        searchValue={rightSearch}
+                        onSearchChange={setRightSearch}
+                        emptyLabel="No members in group"
+                    />
+                </Stack>
+            </Group>
+
+            <Divider />
+            
+            <Group justify="flex-end" gap="md">
+                <Button variant="default" onClick={() => setManageOpen(false)}>Cancel</Button>
+                <Button 
+                    leftSection={isSavingMembers ? null : <CheckIcon size={16}/>} 
+                    onClick={saveMembers} 
+                    loading={isSavingMembers}
+                >
+                    Save Changes
+                </Button>
+            </Group>
         </Stack>
       </Drawer>
     </div>

@@ -4,15 +4,15 @@ import {
   Divider, Box, MantineTheme, Button, Stack, Loader, Select, Textarea, 
   Collapse, NumberInput, Paper, ActionIcon, Badge, Tooltip, 
   FileInput, CloseButton, Image as MantineImage, SegmentedControl,
-  useMantineColorScheme
+  useMantineColorScheme, TextInput // Added TextInput
 } from '@mantine/core';
 import { 
   ImageIcon, TypeIcon, SquareIcon, CircleIcon, TriangleIcon, FileTextIcon, 
   BoxIcon, HexagonIcon, MinusIcon, BaselineIcon, SparklesIcon, 
   Settings2Icon, PaletteIcon, SunIcon, MaximizeIcon, ScalingIcon,
   MessageSquareIcon, ArrowRightIcon, ApertureIcon, ClockIcon, CloudRainIcon, PaintbrushIcon,
-  EyeIcon, CameraIcon, UploadIcon, RefreshCw, LayersIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon, EyeOffIcon, LockIcon, UnlockIcon,
-  Shapes
+  EyeIcon, CameraIcon, UploadIcon, RefreshCw, LayersIcon, TrashIcon, EyeOffIcon, LockIcon, UnlockIcon,
+  Shapes, GripVerticalIcon, Edit2Icon, CheckIcon // Added Layer Icons
 } from 'lucide-react';
 import { useFabricCanvas } from '../../context/CanvasContext';
 import { useNotification } from '../../context/NotificationContext'; 
@@ -33,6 +33,11 @@ type ChatMessage = {
   promptUsed?: string;
 };
 
+// Added Interface from source
+interface CustomFabricObject extends FabricObject {
+    name?: string;
+}
+
 const Sidebar: React.FC<SidebarProps> = () => {
   const theme = useMantineTheme();
   const { colorScheme } = useMantineColorScheme();
@@ -45,8 +50,15 @@ const Sidebar: React.FC<SidebarProps> = () => {
   
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // --- Layers State ---
-  const [layers, setLayers] = useState<FabricObject[]>([]);
+  // --- Layers State (Updated from Source) ---
+  const [layers, setLayers] = useState<CustomFabricObject[]>([]);
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Renaming State (Added from Source)
+  const [editingLayerId, setEditingLayerId] = useState<number | null>(null);
+  const [tempLayerName, setTempLayerName] = useState('');
 
   // --- AI State ---
   const [mode, setMode] = useState<'classic' | 'chat'>('chat');
@@ -70,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   const syncLayers = useCallback(() => {
     if (canvas) {
-      setLayers([...canvas.getObjects()].reverse());
+      setLayers([...canvas.getObjects()].reverse() as CustomFabricObject[]);
     }
   }, [canvas]);
 
@@ -96,13 +108,14 @@ const Sidebar: React.FC<SidebarProps> = () => {
     };
   }, [canvas, syncLayers]);
 
-  const selectLayer = (obj: FabricObject) => {
+  // --- Layer Actions (Updated Logic) ---
+  const selectLayer = (obj: CustomFabricObject) => {
     if (!canvas) return;
     canvas.setActiveObject(obj);
     canvas.renderAll();
   };
 
-  const deleteLayer = (e: React.MouseEvent, obj: FabricObject) => {
+  const deleteLayer = (e: React.MouseEvent, obj: CustomFabricObject) => {
     e.stopPropagation();
     if (!canvas) return;
     canvas.remove(obj);
@@ -110,16 +123,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
     canvas.renderAll();
   };
 
-  const moveLayer = (e: React.MouseEvent, obj: FabricObject, direction: 'up' | 'down') => {
-    e.stopPropagation();
-    if (!canvas) return;
-    if (direction === 'up') obj.bringForward();
-    else obj.sendBackwards();
-    canvas.renderAll();
-    syncLayers();
-  };
-
-  const toggleVisibility = (e: React.MouseEvent, obj: FabricObject) => {
+  const toggleVisibility = (e: React.MouseEvent, obj: CustomFabricObject) => {
     e.stopPropagation();
     if (!canvas) return;
     obj.set('visible', !obj.visible);
@@ -130,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
     syncLayers();
   };
 
-  const toggleLock = (e: React.MouseEvent, obj: FabricObject) => {
+  const toggleLock = (e: React.MouseEvent, obj: CustomFabricObject) => {
     e.stopPropagation();
     if (!canvas) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,6 +153,49 @@ const Sidebar: React.FC<SidebarProps> = () => {
     syncLayers();
   };
 
+  // --- Layer Renaming Logic (Added from Source) ---
+  const startRenaming = (e: React.MouseEvent, index: number, currentName: string) => {
+      e.stopPropagation();
+      setEditingLayerId(index);
+      setTempLayerName(currentName);
+  };
+
+  const saveLayerName = (index: number) => {
+      const obj = layers[index];
+      if (obj) {
+          obj.set('name', tempLayerName);
+          setLayers(prev => {
+              const newLayers = [...prev];
+              newLayers[index] = { ...obj, name: tempLayerName };
+              return newLayers;
+          });
+      }
+      setEditingLayerId(null);
+  };
+
+  // --- Drag and Drop Logic (Added from Source) ---
+  const setDragItem = (index: number | null) => { dragItem.current = index; };
+  const setDragOverItem = (index: number | null) => { dragOverItem.current = index; };
+
+  const handleSort = () => {
+    if (dragItem.current === null || dragOverItem.current === null || !canvas) return;
+
+    const items = [...layers];
+    const draggedItemContent = items.splice(dragItem.current, 1)[0];
+    items.splice(dragOverItem.current, 0, draggedItemContent);
+    
+    setDragItem(null);
+    setDragOverItem(null);
+    setLayers(items);
+
+    // Sync with Fabric Canvas (Reverse logic as UI is reversed)
+    const newStackOrder = [...items].reverse();
+    newStackOrder.forEach((obj, index) => {
+        canvas.moveObjectTo(obj, index);
+    });
+    canvas.requestRenderAll();
+  };
+
   const getLayerIcon = (type: string | undefined) => {
     switch(type) {
       case 'i-text':
@@ -158,14 +205,18 @@ const Sidebar: React.FC<SidebarProps> = () => {
       case 'circle': return <CircleIcon size={14} />;
       case 'triangle': return <TriangleIcon size={14} />;
       case 'line': return <MinusIcon size={14} />;
+      case 'ellipse': return <CircleIcon size={14} />;
+      case 'polygon': return <HexagonIcon size={14} />;
+      case 'polyline': return <MinusIcon size={14} />;
       default: return <BoxIcon size={14} />;
     }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getLayerName = (obj: any) => {
+    if (obj.name) return obj.name; 
     if (obj.type === 'textbox' || obj.type === 'i-text') {
-      return obj.text ? `Text: "${obj.text.substring(0, 10)}${obj.text.length > 10 ? '...' : ''}"` : 'Text Layer';
+      return obj.text ? `"${obj.text.substring(0, 15)}${obj.text.length > 15 ? '...' : ''}"` : 'Text Layer';
     }
     return obj.type ? obj.type.charAt(0).toUpperCase() + obj.type.slice(1) : 'Layer';
   };
@@ -465,8 +516,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
       <ScrollArea h="calc(100vh - 140px)" mx="-xs" px="xs">
         
+        {/* MODIFIED: Layer Functionality from Source */}
         {activeTab === 'layers' && (
-            <Stack gap="xs">
+            <Stack gap={6}>
                 {layers.length === 0 ? (
                     <Text c="dimmed" ta="center" mt="xl" size="sm">Canvas is empty.</Text>
                 ) : (
@@ -474,48 +526,79 @@ const Sidebar: React.FC<SidebarProps> = () => {
                         const isActive = selectedObject === obj;
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const isLocked = (obj as any).lockMovementX; 
+                        const isEditing = editingLayerId === index;
 
                         return (
                             <Paper 
                                 key={index} 
                                 withBorder 
                                 p={8} 
-                                radius="sm"
-                                bg={isActive 
-                                    ? (isDark ? theme.colors.blue[9] : 'blue.0') 
-                                    : 'transparent'}
+                                radius="md"
+                                bg={isActive ? (isDark ? theme.colors.blue[9] : 'blue.0') : (isDragging && dragItem.current === index ? (isDark ? theme.colors.dark[5] : theme.colors.gray[1]) : 'transparent')}
+                                draggable={!isEditing}
+                                onDragStart={() => { setDragItem(index); setIsDragging(true); }}
+                                onDragEnter={() => setDragOverItem(index)}
+                                onDragEnd={() => { handleSort(); setIsDragging(false); }}
+                                onDragOver={(e) => e.preventDefault()}
                                 style={{ 
-                                    cursor: 'pointer',
-                                    borderColor: isActive ? theme.colors.blue[4] : undefined
+                                    cursor: isEditing ? 'default' : 'grab',
+                                    borderColor: isActive ? theme.colors.blue[4] : undefined,
+                                    opacity: isDragging && dragItem.current === index ? 0.5 : 1,
+                                    transition: 'background-color 0.2s, border-color 0.2s'
                                 }}
                                 onClick={() => selectLayer(obj)}
                             >
-                                <Group justify="space-between" wrap="nowrap">
-                                    <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }}>
-                                        <div style={{ opacity: 0.7 }}>{getLayerIcon(obj.type)}</div>
-                                        <Text size="sm" truncate>
-                                            {getLayerName(obj)}
-                                        </Text>
+                                <Group justify="space-between" wrap="nowrap" gap="xs">
+                                    {/* Left: Drag Handle & Icon */}
+                                    <Group gap="xs" wrap="nowrap" align="center">
+                                        <div style={{ cursor: 'grab', opacity: 0.4, display: 'flex', alignItems: 'center' }}>
+                                            <GripVerticalIcon size={14} />
+                                        </div>
+                                        <div style={{ opacity: 0.7, color: isDark ? theme.white : theme.colors.gray[7] }}>
+                                            {getLayerIcon(obj.type)}
+                                        </div>
                                     </Group>
 
-                                    <Group gap={2}>
+                                    {/* Middle: Name (Editable) */}
+                                    <Box style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
+                                        {isEditing ? (
+                                            <Group gap={4} wrap="nowrap">
+                                                <TextInput 
+                                                    size="xs" 
+                                                    value={tempLayerName} 
+                                                    onChange={(e) => setTempLayerName(e.currentTarget.value)}
+                                                    onKeyDown={(e) => { if(e.key === 'Enter') saveLayerName(index); }}
+                                                    autoFocus
+                                                    styles={{ input: { height: 24, paddingLeft: 6, paddingRight: 6 } }}
+                                                />
+                                                <ActionIcon size="xs" color="green" variant="light" onClick={() => saveLayerName(index)}><CheckIcon size={12}/></ActionIcon>
+                                            </Group>
+                                        ) : (
+                                            <Group gap={4} wrap="nowrap" className="group">
+                                                <Text size="sm" fw={500} truncate style={{ cursor: 'text' }} onClick={(e) => startRenaming(e, index, getLayerName(obj))}>
+                                                    {getLayerName(obj)}
+                                                </Text>
+                                                <ActionIcon 
+                                                    size="xs" variant="transparent" color="gray" 
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => startRenaming(e, index, getLayerName(obj))}
+                                                >
+                                                    <Edit2Icon size={10} />
+                                                </ActionIcon>
+                                            </Group>
+                                        )}
+                                    </Box>
+
+                                    {/* Right: Actions */}
+                                    <Group gap={4} wrap="nowrap">
                                         <ActionIcon size="sm" variant="subtle" color="gray" onClick={(e) => toggleVisibility(e, obj)}>
-                                            {obj.visible ? <EyeIcon size={12} /> : <EyeOffIcon size={12} />}
+                                            {obj.visible ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
                                         </ActionIcon>
                                         <ActionIcon size="sm" variant="subtle" color="gray" onClick={(e) => toggleLock(e, obj)}>
-                                            {isLocked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+                                            {isLocked ? <LockIcon size={14} /> : <UnlockIcon size={14} />}
                                         </ActionIcon>
-                                        
-                                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={(e) => moveLayer(e, obj, 'up')}>
-                                            <ChevronUpIcon size={12} />
-                                        </ActionIcon>
-                                        
-                                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={(e) => moveLayer(e, obj, 'down')}>
-                                            <ChevronDownIcon size={12} />
-                                        </ActionIcon>
-
                                         <ActionIcon size="sm" variant="subtle" color="red" onClick={(e) => deleteLayer(e, obj)}>
-                                            <TrashIcon size={12} />
+                                            <TrashIcon size={14} />
                                         </ActionIcon>
                                     </Group>
                                 </Group>
@@ -564,51 +647,51 @@ const Sidebar: React.FC<SidebarProps> = () => {
                             <Stack gap="md">
                                 {chatHistory.length === 0 && (
                                     <Text size="xs" c="dimmed" ta="center" mt="xl">
-                                        Describe your vision or upload a reference image to start.
+                                            Describe your vision or upload a reference image to start.
                                     </Text>
                                 )}
                                 {chatHistory.map((msg) => (
                                     <Box key={msg.id} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', marginLeft: msg.role === 'user' ? 'auto' : 0 }}>
-                                        {msg.role === 'user' ? (
-                                            <Paper 
-                                                p="xs" 
-                                                radius="md" 
-                                                bg={isDark ? theme.colors.blue[9] : theme.colors.blue[1]}
-                                                style={{
-                                                    color: isDark ? theme.white : theme.black
-                                                }}
-                                            >
-                                                {msg.imageUrl && (
-                                                    <MantineImage 
-                                                        src={msg.imageUrl} 
-                                                        radius="sm" 
-                                                        h={100} 
-                                                        w="auto" 
-                                                        fit="contain" 
-                                                        mb={msg.content ? "xs" : 0} 
-                                                        bg="white"
-                                                    />
-                                                )}
-                                                {msg.content && <Text size="xs">{msg.content}</Text>}
-                                            </Paper>
-                                        ) : (
-                                            <Stack gap={4}>
-                                                {msg.imageUrl ? (
-                                                    <div className="relative group cursor-pointer" onClick={() => msg.imageUrl && addToCanvas(msg.imageUrl)}>
-                                                        <img src={msg.imageUrl} alt="AI" style={{ width: '100%', borderRadius: 8, border: '1px solid #eee' }} />
-                                                        <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" size="sm" color="dark">Click to Add</Badge>
-                                                    </div>
-                                                ) : (
-                                                    <Text size="xs" c="red">{msg.content}</Text>
-                                                )}
-                                            </Stack>
-                                        )}
+                                            {msg.role === 'user' ? (
+                                                <Paper 
+                                                    p="xs" 
+                                                    radius="md" 
+                                                    bg={isDark ? theme.colors.blue[9] : theme.colors.blue[1]}
+                                                    style={{
+                                                        color: isDark ? theme.white : theme.black
+                                                    }}
+                                                >
+                                                        {msg.imageUrl && (
+                                                            <MantineImage 
+                                                                src={msg.imageUrl} 
+                                                                radius="sm" 
+                                                                h={100} 
+                                                                w="auto" 
+                                                                fit="contain" 
+                                                                mb={msg.content ? "xs" : 0} 
+                                                                bg="white"
+                                                            />
+                                                        )}
+                                                        {msg.content && <Text size="xs">{msg.content}</Text>}
+                                                </Paper>
+                                            ) : (
+                                                <Stack gap={4}>
+                                                        {msg.imageUrl ? (
+                                                            <div className="relative group cursor-pointer" onClick={() => msg.imageUrl && addToCanvas(msg.imageUrl)}>
+                                                                <img src={msg.imageUrl} alt="AI" style={{ width: '100%', borderRadius: 8, border: '1px solid #eee' }} />
+                                                                <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" size="sm" color="dark">Click to Add</Badge>
+                                                            </div>
+                                                        ) : (
+                                                            <Text size="xs" c="red">{msg.content}</Text>
+                                                        )}
+                                                </Stack>
+                                            )}
                                     </Box>
                                 ))}
                                 {isGenerating && (
                                     <Group gap={4} justify="center" mt="xs">
-                                        <Loader size="xs" type="dots" />
-                                        <Text size="xs" c="dimmed">Generating...</Text>
+                                            <Loader size="xs" type="dots" />
+                                            <Text size="xs" c="dimmed">Generating...</Text>
                                     </Group>
                                 )}
                             </Stack>
