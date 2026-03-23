@@ -9,23 +9,11 @@ type CustomLabelProps = PieLabelRenderProps & {
   percent: number;
 };
 
-const PlatformBreakdown: React.FC = () => {
-  const data = [{
-    name: 'Facebook',
-    value: 35
-  }, {
-    name: 'Instagram',
-    value: 28
-  }, {
-    name: 'Twitter',
-    value: 18
-  }, {
-    name: 'Email',
-    value: 12
-  }, {
-    name: 'LinkedIn',
-    value: 7
-  }];
+interface PlatformBreakdownProps {
+  data: { name: string; value: number }[];
+}
+
+const PlatformBreakdown: React.FC<PlatformBreakdownProps> = ({ data }) => {
   const COLORS = ['#1877F2', '#E4405F', '#1DA1F2', '#EA4335', '#0A66C2'];
 
   return <Paper shadow="sm" p="lg" withBorder>

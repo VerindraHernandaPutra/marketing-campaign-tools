@@ -2,43 +2,18 @@ import React from 'react';
 import { Paper, Text } from '@mantine/core';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const EngagementChart: React.FC = () => {
-  const data = [{
-    date: 'Jan 1',
-    reach: 4000,
-    engagement: 2400,
-    clicks: 1200
-  }, {
-    date: 'Jan 3',
-    reach: 3000,
-    engagement: 1398,
-    clicks: 980
-  }, {
-    date: 'Jan 5',
-    reach: 2000,
-    engagement: 9800,
-    clicks: 1500
-  }, {
-    date: 'Jan 7',
-    reach: 2780,
-    engagement: 3908,
-    clicks: 1800
-  }, {
-    date: 'Jan 9',
-    reach: 1890,
-    engagement: 4800,
-    clicks: 1400
-  }, {
-    date: 'Jan 11',
-    reach: 2390,
-    engagement: 3800,
-    clicks: 1600
-  }, {
-    date: 'Jan 13',
-    reach: 3490,
-    engagement: 4300,
-    clicks: 2100
-  }];
+export interface EngagementData {
+  date: string;
+  reach: number;
+  engagement: number;
+  clicks: number;
+}
+
+interface EngagementChartProps {
+  data: EngagementData[];
+}
+
+const EngagementChart: React.FC<EngagementChartProps> = ({ data }) => {
 
   return <Paper shadow="sm" p="lg" withBorder>
       {/* 'weight' diubah menjadi 'fw' */}
