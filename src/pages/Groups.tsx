@@ -10,8 +10,7 @@ import {
   ArrowRightIcon, ArrowLeftIcon, CheckIcon, UserIcon
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
 import { useAuth } from '../auth/useAuth';
 
 interface MarketingGroup {
@@ -304,22 +303,19 @@ const Groups: React.FC = () => {
   );
 
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-      <DashboardHeader colorScheme="light" toggleColorScheme={() => {}} />
-      <div className="flex flex-1">
-        <DashboardSidebar />
-        <Container size="xl" py="xl" className="flex-1">
-           <Group justify="space-between" mb="lg">
-            <div>
-                <Title order={2}>Client Groups</Title>
-                <Text c="dimmed">Segment your audience</Text>
-            </div>
-            <Button leftSection={<PlusIcon size={16} />} onClick={() => {
-              setEditingGroup(null); setGroupName(''); setGroupDesc(''); setModalOpen(true);
-            }}>
-              Create Group
-            </Button>
-          </Group>
+    <PageShell>
+      <Container size="xl" p={0}>
+         <Group justify="space-between" mb="lg">
+          <div>
+              <Title order={3}>Client Groups</Title>
+              <Text c="dimmed" size="sm">Segment your audience</Text>
+          </div>
+          <Button size="xs" leftSection={<PlusIcon size={13} />} onClick={() => {
+            setEditingGroup(null); setGroupName(''); setGroupDesc(''); setModalOpen(true);
+          }}>
+            Create Group
+          </Button>
+        </Group>
 
           <Paper shadow="sm" p="md" withBorder>
             <LoadingOverlay visible={loading} />
@@ -409,8 +405,7 @@ const Groups: React.FC = () => {
                 </Group>
             )}
           </Paper>
-        </Container>
-      </div>
+      </Container>
 
       {/* Create/Edit Modal */}
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingGroup ? "Edit Group" : "Create Group"}>
@@ -507,7 +502,7 @@ const Groups: React.FC = () => {
             </Group>
         </Stack>
       </Drawer>
-    </div>
+    </PageShell>
   );
 };
 

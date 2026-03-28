@@ -150,7 +150,7 @@ const DashboardContent: React.FC = () => {
       
       const query = supabase
         .from('projects')
-        .select('*')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(100); 
@@ -160,7 +160,9 @@ const DashboardContent: React.FC = () => {
       if (error) {
         console.error('Error fetching recent projects:', error);
       } else if (data) {
-        setProjects(data as Project[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
+        setProjects(mapped);
       }
       setLoadingProjects(false);
   }, [user]);
@@ -171,7 +173,7 @@ const DashboardContent: React.FC = () => {
       
       const query = supabase
         .from('projects')
-        .select('*')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
         .eq('organization_id', currentOrgId)
         .eq('is_template', true)
         .order('updated_at', { ascending: false });
@@ -181,7 +183,9 @@ const DashboardContent: React.FC = () => {
       if (error) {
         console.error('Error fetching templates:', error);
       } else if (data) {
-        setTemplates(data as Project[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
+        setTemplates(mapped);
       }
       setLoadingTemplates(false);
   }, [currentOrgId]);
@@ -192,7 +196,7 @@ const DashboardContent: React.FC = () => {
       
       const query = supabase
         .from('projects')
-        .select('*')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
         .eq('organization_id', currentOrgId)
         .eq('is_template', false) 
         .order('updated_at', { ascending: false });
@@ -202,7 +206,9 @@ const DashboardContent: React.FC = () => {
       if (error) {
         console.error('Error fetching campaign designs:', error);
       } else if (data) {
-        setCampaignDesigns(data as Project[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
+        setCampaignDesigns(mapped);
       }
       setLoadingCampaigns(false);
   }, [currentOrgId]); 

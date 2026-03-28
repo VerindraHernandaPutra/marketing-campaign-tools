@@ -9,12 +9,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // --- THIS IS THE MISSING LOGIC ---
+  // --- THIS IS THE FIX ---
   useEffect(() => {
     // 1. Get the current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(prevUser => {
+          const newUser = session?.user ?? null;
+          if (prevUser && newUser && JSON.stringify(prevUser) === JSON.stringify(newUser)) return prevUser;
+          return newUser;
+      });
       setLoading(false);
     });
 
@@ -22,7 +26,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(prevUser => {
+            const newUser = session?.user ?? null;
+            // Deep equality check to prevent reference changes on background token refreshes (Window Focus)
+            if (prevUser && newUser && JSON.stringify(prevUser) === JSON.stringify(newUser)) return prevUser;
+            return newUser;
+        });
         setLoading(false);
       }
     );

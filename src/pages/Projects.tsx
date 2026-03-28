@@ -1,5 +1,5 @@
-// [cite: src/pages/Projects.tsx]
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   MantineProvider, Flex, Container, Title, Box, Group, Button, TextInput, 
   Select, SegmentedControl, SimpleGrid, Center, Loader, Text, Tooltip,
@@ -57,9 +57,6 @@ const Projects: React.FC = () => {
   const [activePage, setActivePage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<string>('12');
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creationPreset, setCreationPreset] = useState<{width?: number, height?: number, title: string, tags: string[]} | null>(null);
@@ -69,36 +66,31 @@ const Projects: React.FC = () => {
 
   const isOperator = isSuperAdmin || role === 'operator';
 
+  const { data: projects = [], isLoading: loading, refetch: fetchProjects } = useQuery({
+    queryKey: ['projects', user?.id],
+    queryFn: async () => {
+        if (!user) return [];
+        const { data, error } = await supabase
+            .from('projects')
+            .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false });
+            
+        if (error) throw error;
+        // Reconstruct canvas_data for the frontend type
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (data || []).map((d: any) => ({
+            ...d,
+            canvas_data: { width: d.width, height: d.height }
+        })) as Project[];
+    },
+    enabled: !!user,
+  });
+
   // --- Reset Pagination on Filter Change ---
   useEffect(() => {
     setActivePage(1);
   }, [searchQuery, sortBy, selectedTag, itemsPerPage]);
-
-  const fetchProjects = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    
-    // Fetch all projects for this user/org (Client-side filtering for better UX on small datasets)
-    // For very large datasets, move filtering to Supabase query
-    const query = supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching projects:', error);
-    } else if (data) {
-      setProjects(data as Project[]);
-    }
-    setLoading(false);
-  }, [user]);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
 
   // --- Process Data (Filter, Sort, Paginate) ---
   const processData = () => {

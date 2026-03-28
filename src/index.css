@@ -3,3 +3,74 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 /* DO NOT DELETE THESE TAILWIND IMPORTS, OTHERWISE THE STYLING WILL NOT RENDER AT ALL */
+
+/* ===== GLOBAL MINIMALIST SIZING ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px; /* Base font size reduced from 16px */
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Slim scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Mantine NavLink overrides - more compact */
+.mantine-NavLink-root {
+  border-radius: 5px !important;
+  padding: 5px 8px !important;
+  min-height: 30px !important;
+}
+
+.mantine-NavLink-label {
+  font-size: 0.8rem !important;
+}
+
+/* Compact table rows */
+.mantine-Table-td,
+.mantine-Table-th {
+  padding: 7px 10px !important;
+  font-size: 0.78rem !important;
+}
+
+/* Compact cards */
+.mantine-Paper-root {
+  border-radius: 8px !important;
+}
+
+/* Make buttons slightly smaller */
+.mantine-Button-root {
+  font-size: 0.78rem !important;
+}
+
+/* Smaller badges */
+.mantine-Badge-root {
+  font-size: 0.68rem !important;
+}
+
+/* Tighter container padding */
+.mantine-Container-root {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
-  MantineProvider, 
-  Flex, 
   Container, 
   Title, 
   Box, 
@@ -14,83 +13,50 @@ import {
   ThemeIcon,
   Tabs
 } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
 import { SparklesIcon, RefreshCw, Mail, LayoutDashboard, Share2 } from 'lucide-react';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
 import MetricsCard from '../components/Analytics/MetricsCard';
 import EngagementChart from '../components/Analytics/EngagementChart';
 import PlatformBreakdown from '../components/Analytics/PlatformBreakdown';
 import CampaignPerformance from '../components/Analytics/CampaignPerformance';
 import EmailPerformance from '../components/Analytics/EmailPerformance';
 import { supabase } from '../supabaseClient';
-import '@mantine/core/styles.css';
 
 type TrendDirection = 'up' | 'down';
 
 const Analytics: React.FC = () => {
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const [timeRange, setTimeRange] = useState<string | null>('7d');
   
-  // AI Summary State
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
 
-  // Email Stats State
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [emailStats, setEmailStats] = useState<any>(null);
-  const [loadingEmail, setLoadingEmail] = useState(false);
 
-  const toggleColorScheme = (value?: 'light' | 'dark') => 
-    setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
-
-  // --- DYNAMIC DATA STATES ---
-  const [platformData, setPlatformData] = useState<{name: string, value: number}[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [campaignData, setCampaignData] = useState<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [engagementData, setEngagementData] = useState<any[]>([]);
-  const [overview, setOverview] = useState({
-    reach: { value: "0", change: 0, trend: "up" as TrendDirection },
-    engagement: { value: "0", change: 0, trend: "up" as TrendDirection },
-    clicks: { value: "0", change: 0, trend: "up" as TrendDirection },
-    conversions: { value: "0", change: 0, trend: "up" as TrendDirection }
+  // --- DYNAMIC DATA QUERIES ---
+  const { data: emailStats = null, isLoading: loadingEmail, refetch: fetchEmailStats } = useQuery({
+    queryKey: ['emailStats'],
+    queryFn: async () => {
+        try {
+            const response = await fetch('http://localhost:3050/api/email-stats');
+            if (response.ok) return await response.json();
+            throw new Error("Localhost failed");
+        } catch {
+            try {
+                const response = await fetch('https://marketing.gloaicloud.com:3050/api/email-stats');
+                if (response.ok) return await response.json();
+            } catch (e) {
+                console.error("Failed to fetch production stats:", e);
+            }
+            return { total: 0, delivered: 0, sent: 0, bounced: 0, opened: 0, clicked: 0, recent_emails: [] };
+        }
+    }
   });
 
-  const fetchEmailStats = async () => {
-    setLoadingEmail(true);
-    try {
-        let response;
-        try {
-            response = await fetch('http://localhost:3050/api/email-stats');
-        } catch {
-            console.warn("Localhost fetch failed, trying Production...");
-            response = await fetch('https://marketing.gloaicloud.com:3050/api/email-stats');
-        }
-
-        if (response.ok) {
-            const data = await response.json();
-            setEmailStats(data);
-        } else {
-            console.error("Failed to fetch email stats:", response.statusText);
-            setEmailStats({ total: 0, delivered: 0, sent: 0, bounced: 0, opened: 0, clicked: 0, recent_emails: [] });
-        }
-    } catch (error) {
-        console.error("Error connecting to analytics server:", error);
-        setEmailStats({ total: 0, delivered: 0, sent: 0, bounced: 0, opened: 0, clicked: 0, recent_emails: [] });
-    } finally {
-        setLoadingEmail(false);
-    }
-  };
-
-  const fetchSupabaseStats = async () => {
-    try {
-      // 1. WhatsApp Stats
+  const { data: supabaseStats } = useQuery({
+    queryKey: ['supabaseStats'],
+    queryFn: async () => {
       const { data: waData } = await supabase.from('whatsapp_outbox').select('status');
       const waCount = waData ? waData.length : 0;
 
-      // 2. Social Posts
       const { data: socialData } = await supabase.from('social_posts').select('platforms, status');
       let fbCount = 0, igCount = 0, twCount = 0, liCount = 0;
       if (socialData) {
@@ -102,79 +68,63 @@ const Analytics: React.FC = () => {
         });
       }
 
-      // 3. Campaigns
       const { data: campData } = await supabase.from('marketing_campaigns').select('*').order('created_at', { ascending: false }).limit(5);
       
-      // Compute Overview
-      const socialCount = socialData ? socialData.length : 0;
-      const totalReach = waCount + (emailStats?.total || 0) + socialCount;
-      const totalEngagement = emailStats?.opened || 0; // Only resend tracks opens right now
-      const totalClicks = emailStats?.clicked || 0;    // Only resend tracks clicks right now
-      
-      setOverview({
-          reach: { value: totalReach.toLocaleString(), change: 0, trend: 'up' },
-          engagement: { value: totalEngagement.toString(), change: 0, trend: 'up' },
-          clicks: { value: totalClicks.toString(), change: 0, trend: 'up' },
-          conversions: { value: "0", change: 0, trend: 'up' }
-      });
+      const { data: linkData } = await supabase.from('link_clicks').select('platform, clicks');
 
-      // Compute Platform Breakdown
+      return { waCount, socialData, fbCount, igCount, twCount, liCount, campData, linkData };
+    }
+  });
+
+  // --- DERIVED DATA ---
+  const { overview, platformData, campaignData, engagementData } = useMemo(() => {
+      const waCount = supabaseStats?.waCount || 0;
+      const socialCount = supabaseStats?.socialData ? supabaseStats.socialData.length : 0;
+      const totalReach = waCount + (emailStats?.total || 0) + socialCount;
+      const totalEngagement = emailStats?.opened || 0; 
+      
+      // Calculate Universal Link tracking total
+      const trackedClicks = supabaseStats?.linkData ? supabaseStats.linkData.reduce((acc: number, curr: any) => acc + (curr.clicks || 0), 0) : 0;
+      const totalClicks = (emailStats?.clicked || 0) + trackedClicks;
+
+      const overviewData = {
+          reach: { value: totalReach.toLocaleString(), change: 0, trend: 'up' as TrendDirection },
+          engagement: { value: totalEngagement.toString(), change: 0, trend: 'up' as TrendDirection },
+          clicks: { value: totalClicks.toString(), change: 0, trend: 'up' as TrendDirection },
+          conversions: { value: "0", change: 0, trend: 'up' as TrendDirection }
+      };
+
       const pData = [];
-      if (fbCount > 0) pData.push({ name: 'Facebook', value: fbCount });
-      if (igCount > 0) pData.push({ name: 'Instagram', value: igCount });
-      if (twCount > 0) pData.push({ name: 'Twitter', value: twCount });
-      if (liCount > 0) pData.push({ name: 'LinkedIn', value: liCount });
+      if (supabaseStats?.fbCount) pData.push({ name: 'Facebook', value: supabaseStats.fbCount });
+      if (supabaseStats?.igCount) pData.push({ name: 'Instagram', value: supabaseStats.igCount });
+      if (supabaseStats?.twCount) pData.push({ name: 'Twitter', value: supabaseStats.twCount });
+      if (supabaseStats?.liCount) pData.push({ name: 'LinkedIn', value: supabaseStats.liCount });
       if (waCount > 0) pData.push({ name: 'WhatsApp', value: waCount });
       if (emailStats?.total > 0) pData.push({ name: 'Email', value: emailStats.total });
-      
-      // Fallback if empty
       if (pData.length === 0) pData.push({ name: 'No Data', value: 1 });
-      setPlatformData(pData);
 
-      // Compute Campaign Table (Using exact real data, No synthetic numbers)
-      if (campData) {
-          const formattedCamps = campData.map(c => {
-              // Calculate Reach based on selected platforms (1 per platform selected)
-              const platCount = c.platforms?.length || 0;
-              
-              return {
-                  id: c.id,
-                  name: c.title || 'Untitled',
-                  reach: platCount,
-                  engagement: c.platforms?.includes('email') ? (emailStats?.opened || 0) : 0,
-                  clicks: c.platforms?.includes('email') ? (emailStats?.clicked || 0) : 0,
-                  conversions: 0,
-                  performance: c.status === 'sent' ? 100 : (c.status === 'scheduled' ? 50 : 0)
-              };
-          });
-          setCampaignData(formattedCamps);
-      }
+      const cData = supabaseStats?.campData ? supabaseStats.campData.map((c: any) => {
+          const platCount = c.platforms?.length || 0;
+          return {
+              id: c.id,
+              name: c.title || 'Untitled',
+              reach: platCount,
+              engagement: c.platforms?.includes('email') ? (emailStats?.opened || 0) : 0,
+              clicks: c.platforms?.includes('email') ? (emailStats?.clicked || 0) : 0,
+              conversions: 0,
+              performance: c.status === 'sent' ? 100 : (c.status === 'scheduled' ? 50 : 0)
+          };
+      }) : [];
 
-      // Dummy Engagement over time (Synthesized from totals, kept flat to avoid fake spikes)
-      setEngagementData([
-          { date: 'Mon', reach: totalReach, engagement: totalEngagement, clicks: totalClicks },
-          { date: 'Tue', reach: totalReach, engagement: totalEngagement, clicks: totalClicks },
-          { date: 'Wed', reach: totalReach, engagement: totalEngagement, clicks: totalClicks },
-          { date: 'Thu', reach: totalReach, engagement: totalEngagement, clicks: totalClicks },
-          { date: 'Fri', reach: totalReach, engagement: totalEngagement, clicks: totalClicks }
-      ]);
-      
-    } catch (e) {
-      console.error("Error fetching Supabase stats:", e);
-    }
-  };
+      const eData = Array(5).fill(0).map((_, i) => ({
+          date: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][i],
+          reach: totalReach,
+          engagement: totalEngagement,
+          clicks: totalClicks
+      }));
 
-  useEffect(() => {
-    fetchEmailStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (emailStats !== null) {
-      fetchSupabaseStats();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailStats]);
+      return { overview: overviewData, platformData: pData, campaignData: cData, engagementData: eData };
+  }, [emailStats, supabaseStats]);
 
   const handleGenerateSummary = async () => {
     setIsSummarizing(true);
@@ -198,19 +148,12 @@ const Analytics: React.FC = () => {
   };
 
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
-        
-        <Flex>
-          <DashboardSidebar />
-          
-          <Box className="flex-1 p-8 bg-gray-50 dark:bg-gray-900">
-            <Container size="xl">
+    <PageShell>
+      <Container size="xl" p={0}>
               <Group justify="space-between" mb="xl">
                 <Title order={2}>Marketing Analytics</Title>
                 <Group>
-                   <Button variant="default" leftSection={<RefreshCw size={16} />} onClick={fetchEmailStats} loading={loadingEmail}>
+                   <Button variant="default" leftSection={<RefreshCw size={16} />} onClick={() => fetchEmailStats()} loading={loadingEmail}>
                        Refresh
                    </Button>
                    <Select 
@@ -304,10 +247,7 @@ const Analytics: React.FC = () => {
                  </Tabs.Panel>
               </Tabs>
             </Container>
-          </Box>
-        </Flex>
-      </div>
-    </MantineProvider>
+    </PageShell>
   );
 };
 

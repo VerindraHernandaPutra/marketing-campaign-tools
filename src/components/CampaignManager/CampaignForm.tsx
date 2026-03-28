@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image } from '@mantine/core';
+import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image, MultiSelect } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../auth/useAuth';
+import { useUserRole } from '../../auth/UserContext';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import PlatformSelector from './PlatformSelector';
 import WhatsappFlow from './flows/WhatsappFlow';
@@ -14,6 +15,7 @@ import ProjectMediaModal from './ProjectMediaModal';
 
 const CampaignForm: React.FC = () => {
   const { user } = useAuth();
+  const { currentOrgId } = useUserRole();
   const navigate = useNavigate();
   const { campaignId } = useParams();
   const location = useLocation();
@@ -35,6 +37,9 @@ const CampaignForm: React.FC = () => {
 
   const [groups, setGroups] = useState<{ value: string, label: string }[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  
+  const [clientsList, setClientsList] = useState<{ value: string, label: string }[]>([]);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
 
 
@@ -60,15 +65,17 @@ const CampaignForm: React.FC = () => {
 
 
   useEffect(() => {
-    const fetchGroups = async () => {
-      if (!user) return;
-      const { data } = await supabase.from('groups').select('id, name').eq('user_id', user.id);
-      if (data) {
-        setGroups(data.map(g => ({ value: g.id, label: g.name })));
-      }
+    const fetchTargets = async () => {
+      if (!currentOrgId) return;
+      
+      const { data: gData } = await supabase.from('groups').select('id, name').eq('organization_id', currentOrgId);
+      if (gData) setGroups(gData.map(g => ({ value: g.id, label: g.name })));
+
+      const { data: cData } = await supabase.from('clients').select('id, name, email, phone').eq('organization_id', currentOrgId);
+      if (cData) setClientsList(cData.map(c => ({ value: c.id, label: `${c.name} ${c.email ? `(${c.email})` : ''}` })));
     };
-    fetchGroups();
-  }, [user]);
+    fetchTargets();
+  }, [currentOrgId]);
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -212,6 +219,17 @@ const CampaignForm: React.FC = () => {
     return data.map((item: any) => item.clients);
   };
 
+  const getSpecificClients = async (clientIds: string[]) => {
+    if (clientIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from('clients')
+      .select('phone, email')
+      .in('id', clientIds);
+
+    if (error || !data) return [];
+    return data;
+  };
+
   // --- BACKEND INTEGRATION ---
 
   const scheduleSocialPost = async (finalMediaList: string[]) => {
@@ -256,15 +274,26 @@ const CampaignForm: React.FC = () => {
 
   const getRecipientsForPlatform = async (groupId: string | null, platformType: 'phone' | 'email'): Promise<string[]> => {
     let targets: string[] = [];
+    let combinedClients: any[] = [];
+    
     if (groupId) {
-      const clients = await getClientsFromGroup(groupId);
+      const groupClients = await getClientsFromGroup(groupId);
+      combinedClients = [...combinedClients, ...groupClients];
+    }
+    
+    if (selectedClientIds.length > 0) {
+      const specificClients = await getSpecificClients(selectedClientIds);
+      combinedClients = [...combinedClients, ...specificClients];
+    }
+
+    if (combinedClients.length > 0) {
       if (platformType === 'phone') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        targets = clients.map((c: any) => c.phone).filter((p: any) => p).map((p: any) => p.replace(/\D/g, ''));
+        targets = combinedClients.map(c => c?.phone).filter(p => !!p).map(p => String(p).replace(/\D/g, ''));
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        targets = clients.map((c: any) => c.email).filter((e: any) => e);
+        targets = combinedClients.map(c => c?.email).filter(e => !!e);
       }
+      // Remove duplicates
+      targets = Array.from(new Set(targets));
     } else {
       // Manual Entry fallback
       const input = prompt(`Enter ${platformType === 'phone' ? 'Phone Numbers' : 'Emails'} (comma separated):`);
@@ -277,14 +306,26 @@ const CampaignForm: React.FC = () => {
 
   const sendEmail = async (forceImmediate = false) => {
     let recipients: string[] = [];
+    let combinedClients: any[] = [];
+    
     if (selectedGroupId) {
-      const clients = await getClientsFromGroup(selectedGroupId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      recipients = clients.map((c: any) => c.email).filter((e: any) => e);
+      const groupClients = await getClientsFromGroup(selectedGroupId);
+      combinedClients = [...combinedClients, ...groupClients];
+    }
+    
+    if (selectedClientIds.length > 0) {
+      const specificClients = await getSpecificClients(selectedClientIds);
+      combinedClients = [...combinedClients, ...specificClients];
+    }
+
+    if (combinedClients.length > 0) {
+      recipients = combinedClients.map(c => c?.email).filter(e => !!e);
+      recipients = Array.from(new Set(recipients));
     } else {
       const testEmail = prompt("Enter a test email address:");
       if (testEmail) recipients = [testEmail];
     }
+    
     if (recipients.length === 0) { alert("No valid emails found."); return; }
 
     try {
@@ -335,32 +376,17 @@ const CampaignForm: React.FC = () => {
           attachments: attachments
         };
 
-        // Try 1: Try Localhost first (for testing like right now)
-        let response;
-        try {
-          response = await fetch('http://localhost:3050/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-        } catch (localError) {
-          console.warn("Localhost failed, trying Production server...", localError);
-          // Try 2: Production Server (HTTPS)
-          try {
-            response = await fetch('https://marketing.gloaicloud.com:3050/api/send-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-          } catch (httpsError) {
-            console.error("Production server also failed:", httpsError);
-            throw new Error("Could not connect to Email Server (Port 3050 blocked or server offline).");
-          }
-        }
+        // Call the Supabase Edge Function directly
+        const { data: resultData, error: invokeError } = await supabase.functions.invoke('send-email', {
+            body: payload
+        });
 
-        if (response && !response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `Server refused request: ${response.statusText}`);
+        if (invokeError) {
+            throw new Error(`Edge Function Error: ${invokeError.message || JSON.stringify(invokeError)}`);
+        }
+        
+        if (resultData && resultData.error) {
+            throw new Error(resultData.error);
         }
       }
       // ----------------------------------------------------------------
@@ -471,9 +497,10 @@ const CampaignForm: React.FC = () => {
       alert("Campaign successfully processed!");
       navigate('/campaign-manager');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Campaign Failed:", error);
-      alert(`Failed: ${error.message}`);
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed: ${msg}`);
       await saveCampaignHistory('failed');
     }
     setIsSubmitting(false);
@@ -543,6 +570,16 @@ const CampaignForm: React.FC = () => {
                   data={groups}
                   value={selectedGroupId}
                   onChange={setSelectedGroupId}
+                  clearable
+                  w={300}
+                />
+                <MultiSelect
+                  label="Select Individual Customers"
+                  placeholder="Or select specific people"
+                  data={clientsList}
+                  value={selectedClientIds}
+                  onChange={setSelectedClientIds}
+                  searchable
                   clearable
                   w={300}
                 />
@@ -651,8 +688,11 @@ const CampaignForm: React.FC = () => {
           {activeStep === 2 && (
             <Box>
               <Title order={4} mb="md">Review Targeting</Title>
-              <Text mb="md">
+              <Text mb="sm">
                 Selected Group: <b>{groups.find(g => g.value === selectedGroupId)?.label || "None"}</b>
+              </Text>
+              <Text mb="md">
+                Individual Customers: <b>{selectedClientIds.length > 0 ? `${selectedClientIds.length} users selected` : "None"}</b>
               </Text>
               {renderFlow()}
             </Box>

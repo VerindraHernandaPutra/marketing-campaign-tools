@@ -1,47 +1,32 @@
-import React, { useState } from 'react';
-import { MantineProvider, Flex, Container, Title, Box, Group, Button, Text } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
+import React from 'react';
+import { Container, Title, Box, Group, Button, Text } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
 import CampaignHistory from '../components/CampaignManager/CampaignHistory'; 
-import '@mantine/core/styles.css';
 
 const CampaignManager: React.FC = () => {
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
   const navigate = useNavigate();
 
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
-        <Flex>
-          <DashboardSidebar />
-          <Box className="flex-1 p-8">
-            <Container size="xl">
-              <Group justify="space-between" mb="xl">
-                <div>
-                  <Title order={2}>Campaigns</Title>
-                  <Text c="dimmed" size="sm">Manage and track your marketing efforts</Text>
-                </div>
-                <Button 
-                  leftSection={<PlusIcon size={16} />} 
-                  onClick={() => navigate('/campaign-manager/new')}
-                >
-                  Create Campaign
-                </Button>
-              </Group>
-              
-              {/* Only History Table is shown here now */}
-              <CampaignHistory /> 
-            </Container>
-          </Box>
-        </Flex>
-      </div>
-    </MantineProvider>
+    <PageShell>
+      <Container size="xl" p={0}>
+        <Group justify="space-between" mb="xl">
+          <div>
+            <Title order={3}>Campaigns</Title>
+            <Text c="dimmed" size="sm">Manage and track your marketing efforts</Text>
+          </div>
+          <Button 
+            size="xs"
+            leftSection={<PlusIcon size={14} />} 
+            onClick={() => navigate('/campaign-manager/new')}
+          >
+            Create Campaign
+          </Button>
+        </Group>
+        <CampaignHistory />
+      </Container>
+    </PageShell>
   );
 };
 

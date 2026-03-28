@@ -83,7 +83,7 @@ const Campaigns: React.FC = () => {
     // Fetch projects that are NOT templates (is_template = false)
     const query = supabase
       .from('projects')
-      .select('*')
+      .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
       .eq('organization_id', currentOrgId)
       .eq('is_template', false) 
       .order('updated_at', { ascending: false });
@@ -93,7 +93,12 @@ const Campaigns: React.FC = () => {
     if (error) {
       console.error('Error fetching campaign designs:', error);
     } else {
-      setCampaigns(data as Project[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = (data || []).map((d: any) => ({
+          ...d,
+          canvas_data: { width: d.width, height: d.height }
+      })) as Project[];
+      setCampaigns(mapped);
     }
     setLoading(false);
   }, [currentOrgId]);

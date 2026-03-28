@@ -49,7 +49,7 @@ const ProjectMediaModal: React.FC<ProjectMediaModalProps> = ({ onSelect }) => {
       setLoading(true);
       const { data, error } = await supabase
         .from('projects')
-        .select('id, title, canvas_data, thumbnail_url')
+        .select('id, title, thumbnail_url')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -65,40 +65,49 @@ const ProjectMediaModal: React.FC<ProjectMediaModalProps> = ({ onSelect }) => {
   }, [user]);
 
   useEffect(() => {
-    if (selectedProject) {
-      const project = projects.find((p) => p.id === selectedProject);
-      const images: { url: string; isProjectDesign: boolean }[] = [];
-
-      // 1. Add Project Thumbnail (Represents the full design)
-      const thumbnail = project?.thumbnail_url || 'https://placehold.co/600x400?text=No+Thumbnail';
-      images.push({ url: thumbnail, isProjectDesign: true });
-
-      // 2. Add images inside the canvas (Raw assets)
-      if (project && project.canvas_data && Array.isArray(project.canvas_data.objects)) {
-        const canvasImages = project.canvas_data.objects
-          .filter((obj: CanvasObject) => obj.type === 'image' && typeof obj.src === 'string')
-          .map((obj: CanvasObject) => obj.src as string);
+    const fetchSelectedCanvas = async () => {
+      if (selectedProject) {
+        setLoading(true);
+        const project = projects.find((p) => p.id === selectedProject);
         
-        // Deduplicate
-        canvasImages.forEach((img: string) => {
-          if (!images.find(i => i.url === img)) {
-            images.push({ url: img, isProjectDesign: false });
-          }
-        });
-      }
-      
-      setMedia(images);
+        // Fetch canvas data only when selected (Lazy Load)
+        if (project && !project.canvas_data) {
+           const { data } = await supabase.from('projects').select('canvas_data').eq('id', selectedProject).single();
+           if (data) {
+               project.canvas_data = data.canvas_data;
+           }
+        }
 
-      // Auto-select the first image (Thumbnail)
-      if (images.length > 0) {
-        setSelectedMedia([images[0].url]);
+        const images: { url: string; isProjectDesign: boolean }[] = [];
+
+        // 1. Add Project Thumbnail
+        const thumbnail = project?.thumbnail_url || 'https://placehold.co/600x400?text=No+Thumbnail';
+        images.push({ url: thumbnail, isProjectDesign: true });
+
+        // 2. Add images inside the canvas
+        if (project && project.canvas_data && Array.isArray(project.canvas_data.objects)) {
+          const canvasImages = project.canvas_data.objects
+            .filter((obj: CanvasObject) => obj.type === 'image' && typeof obj.src === 'string')
+            .map((obj: CanvasObject) => obj.src as string);
+          
+          canvasImages.forEach((img: string) => {
+            if (!images.find(i => i.url === img)) {
+              images.push({ url: img, isProjectDesign: false });
+            }
+          });
+        }
+        
+        setMedia(images);
+        if (images.length > 0) setSelectedMedia([images[0].url]);
+        else setSelectedMedia([]);
+        setLoading(false);
       } else {
+        setMedia([]);
         setSelectedMedia([]);
       }
-    } else {
-      setMedia([]);
-      setSelectedMedia([]);
-    }
+    };
+    
+    fetchSelectedCanvas();
   }, [selectedProject, projects]);
 
   // --- Advanced Generation Logic ---

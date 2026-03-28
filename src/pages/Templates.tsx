@@ -80,7 +80,7 @@ const Templates: React.FC = () => {
 
     const query = supabase
       .from('projects')
-      .select('*')
+      .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
       .eq('is_template', true)
       .eq('organization_id', currentOrgId)
       .order('updated_at', { ascending: false });
@@ -90,7 +90,12 @@ const Templates: React.FC = () => {
     if (error) {
       console.error('Error fetching templates:', error);
     } else {
-      setTemplates(data as ProjectTemplate[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = (data || []).map((d: any) => ({
+          ...d,
+          canvas_data: { width: d.width, height: d.height }
+      })) as ProjectTemplate[];
+      setTemplates(mapped);
     }
     setLoading(false);
   }, [currentOrgId]);

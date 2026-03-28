@@ -1,72 +1,77 @@
-// Follow this setup guide to deploy: https://supabase.com/docs/guides/functions/deploy
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-serve(async (req: Request) => {
-  // Handle CORS (Cross-Origin Resource Sharing) for browser requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+// Twilio Config
+const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
+const twilioPhone = Deno.env.get('TWILIO_PHONE_NUMBER') || '';
 
+serve(async (req) => {
   try {
-    // 1. Get the data sent from the Frontend
-    const { message, to } = await req.json()
+    const payload = await req.json();
+    const record = payload.record;
 
-    // 2. Get Secrets from Supabase Vault (Set these via 'npx supabase secrets set ...')
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    // This is your Twilio Sandbox number (e.g., "whatsapp:+14155238886")
-    const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
-
-    if (!accountSid || !authToken || !fromNumber) {
-      throw new Error('Missing Twilio API Credentials')
+    if (!record || !record.phone || !record.message) {
+      return new Response('Missing required fields in webhook payload', { status: 400 });
     }
 
-    // 3. Format the phone number for Twilio (must include "whatsapp:" prefix)
-    // Ensure 'to' has country code but no spaces/dashes. E.g., "628123456789"
-    const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`
-    const formattedFrom = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`
+    const { id, phone, message, media_urls } = record;
 
-    // 4. Send to Twilio API
-    // We use the URL-encoded form data format required by Twilio
-    const body = new URLSearchParams({
-      To: formattedTo,
-      From: formattedFrom,
-      Body: message,
-    })
-
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: body,
-      }
-    )
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to send message via Twilio')
+    let targetPhone = phone.replace(/\D/g, ''); // Ensure digits only
+    if (!targetPhone.startsWith('whatsapp:')) {
+      targetPhone = `whatsapp:+${targetPhone}`;
     }
 
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+    
+    // Construct Form Data for Twilio
+    const formData = new URLSearchParams();
+    formData.append('To', targetPhone);
+    formData.append('From', `whatsapp:${twilioPhone}`);
+    formData.append('Body', message);
 
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+    if (media_urls && Array.isArray(media_urls) && media_urls.length > 0) {
+      media_urls.forEach((url) => {
+        formData.append('MediaUrl', url);
+      });
+    }
+
+    // Call Twilio API using Deno fetch
+    const twilioResponse = await fetch(twilioEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`
+      },
+      body: formData.toString()
+    });
+
+    const twilioResult = await twilioResponse.json();
+
+    if (!twilioResponse.ok) {
+        console.error("Twilio Error:", twilioResult);
+        await supabase.from('whatsapp_outbox').update({ 
+            status: 'failed', 
+            error_message: twilioResult.message || 'Unknown error'
+        }).eq('id', id);
+
+        return new Response(JSON.stringify({ error: 'Twilio failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Success
+    await supabase.from('whatsapp_outbox').update({ 
+        status: 'sent', 
+        error_message: null
+    }).eq('id', id);
+
+    return new Response(JSON.stringify({ success: true, sid: twilioResult.sid }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+  } catch (error: any) {
+    console.error("Webhook processing error:", error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-})
+});

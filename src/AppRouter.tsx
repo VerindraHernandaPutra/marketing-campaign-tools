@@ -11,6 +11,7 @@ import Projects from './pages/Projects';
 import Folders from './pages/Folders';
 import Templates from './pages/Templates';
 import Campaigns from './pages/Campaigns';
+import DesignDashboard from './pages/DesignDashboard';
 import Clients from './pages/Clients';
 import Groups from './pages/Groups';
 import Profile from './pages/Profile';
@@ -19,6 +20,7 @@ import OrganizationDetails from './pages/OrganizationDetails';
 import { LoginPage } from './pages/LoginPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleGuard } from './components/Auth/RoleGuard';
+import Integrations from './pages/Integrations';
 
 export function AppRouter() {
   return (
@@ -29,6 +31,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/integrations" element={<Integrations />} />
 
           {/* SUPER ADMIN */}
           <Route element={<RoleGuard allowedRoles={['admin']} />}>
@@ -49,6 +52,7 @@ export function AppRouter() {
 
           {/* DESIGNER & OPERATOR */}
           <Route element={<RoleGuard allowedRoles={['designer', 'operator']} />}>
+            <Route path="/design-dashboard" element={<DesignDashboard />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/editor/:projectId" element={<App />} />
             <Route path="/templates" element={<Templates />} />

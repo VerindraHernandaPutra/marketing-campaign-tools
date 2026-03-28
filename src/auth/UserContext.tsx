@@ -7,6 +7,7 @@ export type UserRole = 'admin' | 'operator' | 'designer' | 'marketer' | null;
 interface UserContextType {
   role: UserRole;
   currentOrgId: string | null;
+  orgName: string | null;
   loadingRole: boolean;
   isSuperAdmin: boolean;
   switchOrganization: (orgId: string) => Promise<void>;
@@ -18,6 +19,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user } = useAuth();
   const [role, setRole] = useState<UserRole>(null);
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loadingRole, setLoadingRole] = useState(true);
   
@@ -42,6 +44,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsSuperAdmin(false);
     setRole(null);
     setCurrentOrgId(null);
+    setOrgName(null);
 
     if (!user) {
         setLoadingRole(false);
@@ -63,10 +66,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return; 
       }
 
-      // 2. Fetch Organization Role
+      // 2. Fetch Organization Role + Name
       const { data: membership } = await supabase
         .from('organization_members')
-        .select('organization_id, role')
+        .select('organization_id, role, organizations(name)')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
@@ -74,6 +77,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (membership) {
         setCurrentOrgId(membership.organization_id);
         setRole(membership.role as UserRole);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setOrgName((membership as any).organizations?.name || null);
       } else {
         setRole(null);
       }
@@ -108,7 +113,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <UserContext.Provider value={{ role, currentOrgId, loadingRole, isSuperAdmin, switchOrganization }}>
+    <UserContext.Provider value={{ role, currentOrgId, orgName, loadingRole, isSuperAdmin, switchOrganization }}>
       {children}
     </UserContext.Provider>
   );

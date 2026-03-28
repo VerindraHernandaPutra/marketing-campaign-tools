@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Container,
   Title,
   Button,
   Table,
@@ -20,8 +19,7 @@ import {
 } from '@mantine/core';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon, SortAscIcon, PhoneIcon, MailIcon, MapPinIcon } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
 import { useAuth } from '../auth/useAuth';
 
 interface Client {
@@ -167,22 +165,17 @@ const Clients: React.FC = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-       <DashboardHeader colorScheme="light" toggleColorScheme={() => {}} />
-       <div className="flex flex-1">
-        <DashboardSidebar />
-        <Container size="xl" py="xl" className="flex-1">
-          <Group justify="space-between" mb="lg">
-            <div>
-                <Title order={2}>Clients</Title>
-                <Text c="dimmed">Manage your customer database</Text>
-            </div>
-            <Button leftSection={<PlusIcon size={16} />} onClick={() => openModal()}>
-              Add Client
-            </Button>
-          </Group>
-
-          <Paper shadow="sm" p="md" withBorder>
+    <PageShell>
+      <Group justify="space-between" mb="lg">
+        <div>
+            <Title order={3}>Clients</Title>
+            <Text c="dimmed" size="sm">Manage your customer database</Text>
+        </div>
+        <Button size="xs" leftSection={<PlusIcon size={13} />} onClick={() => openModal()}>
+          Add Client
+        </Button>
+      </Group>
+      <Paper shadow="xs" p="md" withBorder>
             <LoadingOverlay visible={loading} />
 
              {/* --- Table Controls --- */}
@@ -330,9 +323,7 @@ const Clients: React.FC = () => {
                 </Group>
             )}
 
-          </Paper>
-        </Container>
-      </div>
+      </Paper>
 
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingClient ? "Edit Client" : "Add New Client"}>
         <Stack gap="sm">
@@ -386,7 +377,7 @@ const Clients: React.FC = () => {
             </Group>
         </Stack>
       </Modal>
-    </div>
+    </PageShell>
   );
 };
 
