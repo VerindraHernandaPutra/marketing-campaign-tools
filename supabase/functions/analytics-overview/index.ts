@@ -119,9 +119,12 @@ function getSocialResponseData(row: AnyRow): AnyRow {
 
 function extractFacebookPostId(row: AnyRow): string | null {
   const response = getSocialResponseData(row);
+  // post_id is the story/post node — required for the /insights endpoint.
+  // id is the photo node ID (returned by /photos) which doesn't support post insights.
   return (
-    response?.results?.facebook?.id ||
     response?.results?.facebook?.post_id ||
+    response?.results?.facebook?.id ||
+    response?.facebook?.post_id ||
     response?.facebook?.id ||
     response?.id ||
     null
@@ -213,26 +216,40 @@ async function fetchMetaInsightsForFacebookPost(postId: string, accessToken: str
 
 async function fetchMetaInsightsForInstagramMedia(mediaId: string, accessToken: string): Promise<SocialInsightTotals> {
   try {
-    const response = await fetch(
-      `https://graph.facebook.com/v19.0/${mediaId}?fields=like_count,comments_count,insights.metric(impressions,reach,engagement,saved)&access_token=${encodeURIComponent(accessToken)}`
+    const mediaResponse = await fetch(
+      `https://graph.facebook.com/v19.0/${mediaId}?fields=like_count,comments_count&access_token=${encodeURIComponent(accessToken)}`
     );
-    const payload = await response.json();
-    if (!response.ok || payload.error) return { reach: 0, engagement: 0, clicks: 0, likes: 0, comments: 0, shares: 0 };
+    const mediaPayload = await mediaResponse.json();
+    if (!mediaResponse.ok || mediaPayload.error) return { reach: 0, engagement: 0, clicks: 0, likes: 0, comments: 0, shares: 0 };
 
-    const values = Array.isArray(payload?.insights?.data) ? payload.insights.data : [];
-    const lookup = new Map<string, number>();
-    for (const item of values) {
-      const name = String(item?.name || "");
-      const value = Array.isArray(item?.values) ? Number(item.values[0]?.value || 0) : Number(item?.value || 0);
-      lookup.set(name, value);
+    const likes = Number(mediaPayload?.like_count || 0);
+    const comments = Number(mediaPayload?.comments_count || 0);
+
+    let reach = 0;
+    let engagement = 0;
+
+    try {
+      const insightResponse = await fetch(
+        `https://graph.facebook.com/v19.0/${mediaId}/insights?metric=impressions,reach,engagement,saved&access_token=${encodeURIComponent(accessToken)}`
+      );
+      const insightPayload = await insightResponse.json();
+      if (insightResponse.ok && !insightPayload.error) {
+        const lookup = new Map<string, number>();
+        for (const item of (Array.isArray(insightPayload?.data) ? insightPayload.data : [])) {
+          const name = String(item?.name || "");
+          const value = Array.isArray(item?.values) ? Number(item.values[0]?.value || 0) : Number(item?.value || 0);
+          lookup.set(name, value);
+        }
+        reach = lookup.get("reach") || lookup.get("impressions") || 0;
+        engagement = lookup.get("engagement") || 0;
+      }
+    } catch {
+      // keep defaults
     }
 
-    const likes = Number(payload?.like_count || 0);
-    const comments = Number(payload?.comments_count || 0);
-
     return {
-      reach: lookup.get("reach") || lookup.get("impressions") || 0,
-      engagement: lookup.get("engagement") || likes + comments,
+      reach,
+      engagement: engagement || likes + comments,
       clicks: 0,
       likes,
       comments,
@@ -747,12 +764,17 @@ serve(async (req) => {
         direction: "outbound",
       }));
 
+    const convIdToPhone = new Map<string, string>();
+    for (const conv of conversationRows) {
+      convIdToPhone.set(String(conv.id), String(conv.external_contact_id || conv.contact_name || conv.id));
+    }
+
     const whatsappIncoming = [...incomingMessages]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 10)
       .map((row) => ({
         id: row.id,
-        phone: row.conversation_id || "-",
+        phone: convIdToPhone.get(String(row.conversation_id)) || row.conversation_id || "-",
         message: String(row.content || "").slice(0, 60),
         status: row.status || "received",
         created_at: row.created_at,

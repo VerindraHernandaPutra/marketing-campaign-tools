@@ -250,7 +250,7 @@ const Analytics: React.FC = () => {
                  <Tabs.Panel value="whatsapp">
                      <Box mb="md">
                         <Text size="sm" c="dimmed">
-                          WhatsApp uses your Fonnte delivery stats and inbox activity. Sent, pending, failed, and received counts are split here so it does not mix with Meta social publishing.
+                          WhatsApp uses Meta Cloud API delivery stats and inbox activity. Sent, pending, failed, and received counts are split here so it does not mix with Meta social publishing.
                         </Text>
                      </Box>
                      <WhatsAppPerformance stats={whatsappStats} loading={loadingAnalytics} campaigns={whatsappCampaigns} />

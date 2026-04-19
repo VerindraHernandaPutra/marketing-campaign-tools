@@ -84,12 +84,14 @@ const IntegrationsResend = () => {
   const handleDisconnect = async () => {
     if (!confirm('Are you sure you want to remove the Resend integration?')) return;
     setLoading(true);
-    await supabase
-      .from('organization_integrations')
-      .delete()
-      .eq('organization_id', currentOrgId)
-      .eq('platform', 'resend');
-
+    const { data, error } = await supabase.functions.invoke('disconnect-integration', {
+      body: { organizationId: currentOrgId, platformPrefix: 'resend' },
+    });
+    if (error || data?.error) {
+      notify.error('Disconnect Failed', data?.error || error?.message || 'Could not disconnect.');
+      setLoading(false);
+      return;
+    }
     setIsConnected(false);
     setApiKey('');
     setFromEmail('');

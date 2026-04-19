@@ -1,6 +1,6 @@
 // src/auth/useAuth.ts
 import { useContext } from 'react';
-import { AuthContext } from './AuthContext'; // Import the context from the other file
+import { AuthContext } from './AuthContext';
 
 // Create and export the custom hook
 export const useAuth = () => {

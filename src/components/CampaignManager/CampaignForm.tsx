@@ -265,7 +265,7 @@ const CampaignForm: React.FC = () => {
   const scheduleSocialPost = async (finalMediaList: string[], currentCampaignId: string) => {
     // 1. Get selected platforms directly from the main state
     const platformsToPost = selectedPlatforms.filter(p =>
-      ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p)
+      ['facebook', 'instagram'].includes(p)
     );
 
     if (platformsToPost.length === 0) return; // Should not happen if filtered correctly before calling
@@ -560,8 +560,8 @@ const CampaignForm: React.FC = () => {
       }
 
 
-      // 3. Handle Social Media (Backend-Social / Ayrshare)
-      const isSocialSelected = selectedPlatforms.some(p => ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p));
+      // 3. Handle Social Media (Meta Graph API)
+      const isSocialSelected = selectedPlatforms.some(p => ['facebook', 'instagram'].includes(p));
       if (isSocialSelected) {
         await scheduleSocialPost(finalMediaList, currentCampaignId);
       }

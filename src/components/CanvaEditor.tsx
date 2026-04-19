@@ -21,6 +21,8 @@ type LoadedCanvasData = {
 };
 
 const CanvaEditor: React.FC = () => {
+  const [zoom, setZoom] = useState<number>(1);
+  
   const [sidebarOpened, setSidebarOpened] = useState(true);
   const [propertiesPanelOpened, setPropertiesPanelOpened] = useState(true);
 
@@ -324,7 +326,9 @@ const CanvaEditor: React.FC = () => {
 
   const contextValue: CanvasContextType = {
     canvas,
-    selectedObject
+    selectedObject,
+    zoom,
+    setZoom,
   };
 
   return (

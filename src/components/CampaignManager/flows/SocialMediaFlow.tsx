@@ -1,6 +1,6 @@
 import React from 'react';
 import { Paper, Text, Group, ThemeIcon, SimpleGrid, Alert } from '@mantine/core';
-import { ShareIcon, FacebookIcon, InstagramIcon, LinkedinIcon, TwitterIcon, InfoIcon } from 'lucide-react';
+import { ShareIcon, FacebookIcon, InstagramIcon, InfoIcon } from 'lucide-react';
 
 interface SocialMediaFlowProps {
   selectedPlatforms?: string[];
@@ -11,8 +11,6 @@ const SocialMediaFlow: React.FC<SocialMediaFlowProps> = ({ selectedPlatforms = [
   const socialOptions = [
     { id: 'facebook', label: 'Facebook', icon: FacebookIcon, color: '#1877F2' },
     { id: 'instagram', label: 'Instagram', icon: InstagramIcon, color: '#E4405F' },
-    { id: 'twitter', label: 'X (Twitter)', icon: TwitterIcon, color: '#000000' },
-    { id: 'linkedin', label: 'LinkedIn', icon: LinkedinIcon, color: '#0A66C2' },
   ];
 
   // Filter only the selected ones that are relevant to Social Media
@@ -43,7 +41,7 @@ const SocialMediaFlow: React.FC<SocialMediaFlowProps> = ({ selectedPlatforms = [
         </SimpleGrid>
       ) : (
         <Alert variant="light" color="orange" title="No Social Platform Selected">
-          Please select Facebook, Instagram, Twitter, or LinkedIn in the "Platforms" step.
+          Please select Facebook or Instagram in the "Platforms" step.
         </Alert>
       )}
 

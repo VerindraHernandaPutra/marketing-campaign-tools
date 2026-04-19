@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.8'
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // 1. Handle CORS Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -17,7 +18,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
   try {
-    // Ensure only our database webhook (or trusted callers) can trigger sends.
+    // 2. Validate Webhook Secret
     const expectedSecret = Deno.env.get("WH_OUTBOX_WEBHOOK_SECRET") || "";
     if (expectedSecret) {
       const providedSecret = req.headers.get("x-webhook-secret") || "";
@@ -36,78 +37,123 @@ serve(async (req) => {
       return new Response('Missing required fields in webhook payload', { status: 400 });
     }
 
-    const { id, phone, message, media_urls, organization_id } = record;
+    const { id, phone, message, metadata, organization_id } = record;
 
     if (!organization_id) {
         throw new Error("Missing organization_id in record");
     }
 
-    // 1. Fetch the Fonnte Integration for this organization
+    // 3. Fetch the Meta WhatsApp Integration for this organization
     const { data: integration, error: intError } = await supabase
         .from('organization_integrations')
         .select('*')
         .eq('organization_id', organization_id)
-        .eq('platform', 'whatsapp')
+        .eq('platform', 'whatsapp') // Make sure this matches how you save Meta WA integrations
         .order('connected_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
     if (intError || !integration || !integration.access_token) {
-        throw new Error('No Fonnte integration found for this organization');
+        throw new Error('No WhatsApp Meta integration found for this organization');
     }
 
-    const fonnteToken = integration.access_token;
-    const targetPhone = phone.replace(/\D/g, ''); // Ensure digits only
+    const phoneId = integration.provider_account_id;
+    const accessToken = integration.access_token;
+    const cleanNumber = phone.replace(/[^\d]/g, '');
 
-    // 2. Dispatch to Fonnte API
-    const formData = new URLSearchParams();
-    formData.append('target', targetPhone);
-    formData.append('message', message);
-    formData.append('type_bot', 'False');
-    
-    // Add media if exists (using first media URL for now)
-    if (media_urls && Array.isArray(media_urls) && media_urls.length > 0) {
-        formData.append('url', media_urls[0]);
-        formData.append('filename', 'campaign-media');
+    // 4. Get Organization Name (for templates)
+    const { data: orgData } = await supabase.from('organizations').select('name').eq('id', organization_id).single();
+    const orgName = orgData ? orgData.name : 'Your Organization';
+
+    // 5. Construct Meta API Payload
+    let messagePayload: any = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanNumber
+    };
+
+    const taskMetadata = metadata || {};
+
+    if (taskMetadata.template_name) {
+        messagePayload.type = 'template';
+        messagePayload.template = {
+            name: taskMetadata.template_name,
+            language: { code: taskMetadata.template_language || 'en_US' }
+        };
+        
+        if (message && message.trim() !== '' && message !== 'hello_world') {
+            const params = [];
+            const pCount = taskMetadata.param_count || 1;
+            
+            if (pCount >= 2) {
+                 params.push({ type: "text", text: orgName });
+                 params.push({ type: "text", text: message });
+            } else {
+                 params.push({ type: "text", text: message });
+            }
+
+            messagePayload.template.components = [
+                {
+                    type: "body",
+                    parameters: params
+                }
+            ];
+        }
+    } else if (message === 'hello_world') {
+        messagePayload.type = 'template';
+        messagePayload.template = {
+            name: 'hello_world',
+            language: { code: 'en_US' }
+        };
+    } else {
+        messagePayload.type = 'text';
+        messagePayload.text = { body: message };
     }
 
-    const response = await fetch('https://api.fonnte.com/send', {
+    // 6. Dispatch to Meta Graph API
+    const response = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
       method: 'POST',
       headers: {
-        'Authorization': fonnteToken,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
-      body: formData.toString()
+      body: JSON.stringify(messagePayload)
     });
 
-    const raw = await response.text();
-    let result: any;
-    try {
-      result = raw ? JSON.parse(raw) : null;
-    } catch {
-      result = { status: false, reason: raw || `HTTP ${response.status}` };
-    }
+    const result = await response.json();
 
-    if (!result.status) {
-        console.error("Fonnte Error:", result);
+    // 7. Handle Errors from Meta
+    if (!response.ok || result.error) {
+        console.error("Meta Graph API Error:", result.error || result);
         await supabase.from('whatsapp_outbox').update({ 
             status: 'failed', 
             response_data: result
         }).eq('id', id);
 
-        return new Response(JSON.stringify({ error: 'Fonnte failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: result.error?.message || 'Meta API failed' }), { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
     }
 
-    // Success
+    // 8. Success
     await supabase.from('whatsapp_outbox').update({ 
         status: 'sent', 
         response_data: result
     }).eq('id', id);
 
-    return new Response(JSON.stringify({ success: true, id: result.id }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const msgId = result.messages && result.messages[0] ? result.messages[0].id : 'unknown';
+
+    return new Response(JSON.stringify({ success: true, message_id: msgId }), { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
 
   } catch (error: any) {
-    console.error("Fonnte worker error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.error("WhatsApp worker error:", error);
+    return new Response(JSON.stringify({ error: error.message }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });

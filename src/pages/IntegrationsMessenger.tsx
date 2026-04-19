@@ -43,14 +43,14 @@ const IntegrationsMessenger = () => {
 
     const handleDisconnectAll = async () => {
         if (!window.confirm('Are you sure you want to disconnect all Facebook Pages?')) return;
-        const { error } = await supabase
-            .from('organization_integrations')
-            .delete()
-            .eq('organization_id', currentOrgId)
-            .ilike('platform', 'facebook%');
-        if (!error) {
-            setIntegrations([]);
+        const { data, error } = await supabase.functions.invoke('disconnect-integration', {
+            body: { organizationId: currentOrgId, platformPrefix: 'facebook' },
+        });
+        if (error || data?.error) {
+            alert(data?.error || error?.message || 'Failed to disconnect Facebook integration.');
+            return;
         }
+        setIntegrations([]);
     };
 
     return (

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Object as FabricObject } from 'fabric';
 import { Box, useMantineTheme } from '@mantine/core';
+import { useFabricCanvas } from '../../context/CanvasContext';
 
 interface CanvasProps {
   setCanvas: (canvas: FabricCanvas | null) => void;
@@ -17,11 +18,43 @@ const Canvas: React.FC<CanvasProps> = ({
   width,
   height,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [localCanvas, setLocalCanvas] = useState<FabricCanvas | null>(null);
+  const [initialFitDone, setInitialFitDone] = useState(false);
   const theme = useMantineTheme();
 
-  // Initialize Canvas
+  const { zoom, setZoom } = useFabricCanvas();
+  const zoomRef = useRef(zoom);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  // 📐 1. Auto-Fit to 75% of the TRUE Screen size
+  useEffect(() => {
+    // We use a small timeout to let the Sidebar and Header finish rendering first!
+    const timer = setTimeout(() => {
+      if (containerRef.current && !initialFitDone) {
+        const { clientWidth, clientHeight } = containerRef.current;
+        
+        // We subtract 80px to account for the padding/scrollbars
+        const availableWidth = clientWidth - 80;
+        const availableHeight = clientHeight - 80;
+
+        const exactFitScale = Math.min(
+          availableWidth / width,
+          availableHeight / height
+        );
+
+        const targetScale = exactFitScale * 0.75;
+
+        setZoom(targetScale > 0 ? targetScale : 1);
+        setInitialFitDone(true);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [width, height, initialFitDone, setZoom]);
+
+  // 🎨 2. Initialize Canvas
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -67,18 +100,17 @@ const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
-  // Load Data Logic
+  // 📂 3. Load Data Logic
   useEffect(() => {
     if (localCanvas && projectData) {
       try {
         const json = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
-
-        // Ensure background is white immediately
         localCanvas.backgroundColor = '#ffffff';
 
         localCanvas.loadFromJSON(json, () => {
-          // Ensure dimensions and background persist after load
-          localCanvas.setDimensions({ width, height });
+          const currentZ = zoomRef.current;
+          localCanvas.setDimensions({ width: width * currentZ, height: height * currentZ });
+          localCanvas.setZoom(currentZ);
           
           if (!localCanvas.backgroundColor || localCanvas.backgroundColor === 'transparent') {
              localCanvas.backgroundColor = '#ffffff';
@@ -87,7 +119,6 @@ const Canvas: React.FC<CanvasProps> = ({
           localCanvas.calcOffset(); 
           localCanvas.renderAll();
 
-          // Safety render
           setTimeout(() => {
              if (localCanvas && !localCanvas.isDisposed) { 
                  localCanvas.requestRenderAll();
@@ -101,17 +132,17 @@ const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localCanvas, projectData]); 
 
-  // FIX: Proper Resize Logic
+  // 🔍 4. Apply Zoom from Context
   useEffect(() => {
-    if (localCanvas) {
-      // Use Fabric's method to resize, NOT manual DOM manipulation
-      localCanvas.setDimensions({ width, height });
+    if (localCanvas && initialFitDone) {
+      localCanvas.setDimensions({ width: width * zoom, height: height * zoom });
+      localCanvas.setZoom(zoom);
       localCanvas.calcOffset();
       localCanvas.requestRenderAll();
     }
-  }, [localCanvas, width, height]);
+  }, [localCanvas, width, height, zoom, initialFitDone]);
 
-  // Keyboard Shortcuts
+  // ⌨️ 5. Keyboard Shortcuts
   useEffect(() => {
     if (!localCanvas) return;
 
@@ -144,7 +175,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
   return (
     <Box
+      ref={containerRef}
       style={{
+        flex: 1,           // 👈 Magic Fix 1: Fills the remaining screen space
+        minHeight: 0,      // 👈 Magic Fix 2: Stops Flexbox from expanding infinitely
+        minWidth: 0,       // 👈 Magic Fix 3: Stops Flexbox from expanding infinitely
         height: '100%',
         width: '100%',
         display: 'flex', 
@@ -152,10 +187,21 @@ const Canvas: React.FC<CanvasProps> = ({
         alignItems: 'center',
         background: `light-dark(${theme.colors.gray[1]}, ${theme.colors.dark[9]})`,
         overflow: 'auto', 
-        padding: '40px' 
       }}
     >
-      <canvas ref={canvasRef} />
+      {/* The white board wrapper */}
+      <div 
+        style={{ 
+          boxShadow: '0px 10px 30px rgba(0,0,0,0.15)', 
+          background: '#fff',
+          width: `${width * zoom}px`,   
+          height: `${height * zoom}px`, 
+          transition: 'width 0.2s ease, height 0.2s ease',
+          margin: 'auto', // 👈 Ensures it stays centered even if you zoom in really close
+        }}
+      >
+        <canvas ref={canvasRef} />
+      </div>
     </Box>
   );
 };

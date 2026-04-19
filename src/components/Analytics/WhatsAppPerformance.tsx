@@ -39,7 +39,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
         <Center h="100%">
           <Stack align="center" gap="xs">
             <Loader size="sm" color="green" />
-            <Text size="sm" c="dimmed">Fetching WhatsApp and Fonnte stats...</Text>
+            <Text size="sm" c="dimmed">Fetching WhatsApp stats...</Text>
           </Stack>
         </Center>
       </Paper>
@@ -80,7 +80,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
         <Paper withBorder p="md" radius="md">
           <Group justify="space-between" mb="xs">
             <Text size="xs" c="dimmed" fw={700} tt="uppercase">Sent</Text>
-            <Tooltip label="Delivered successfully to Fonnte / Meta queue">
+            <Tooltip label="Delivered successfully via Meta Cloud API">
               <ThemeIcon variant="light" color="teal" size="sm"><CheckCircle size={14} /></ThemeIcon>
             </Tooltip>
           </Group>

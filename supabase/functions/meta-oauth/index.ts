@@ -195,6 +195,7 @@ async function processMetaOAuth(params: { code: string; statePayload: string; re
 }
 
 serve(async (req: Request) => {
+  // Handle CORS Preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -241,7 +242,8 @@ serve(async (req: Request) => {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        // 👈 FIXED: Added ...corsHeaders here!
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }, 
       }
     );
 
@@ -278,7 +280,8 @@ serve(async (req: Request) => {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        // 👈 FIXED: Added ...corsHeaders here!
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
       }
     );
   }

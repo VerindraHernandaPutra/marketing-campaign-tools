@@ -532,7 +532,6 @@ export type Database = {
       }
       social_posts: {
         Row: {
-          ayrshare_id: string | null
           campaign_id: string | null
           content: string | null
           created_at: string | null
@@ -545,7 +544,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          ayrshare_id?: string | null
           campaign_id?: string | null
           content?: string | null
           created_at?: string | null
@@ -558,7 +556,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          ayrshare_id?: string | null
           campaign_id?: string | null
           content?: string | null
           created_at?: string | null

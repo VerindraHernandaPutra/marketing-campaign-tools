@@ -134,48 +134,47 @@ serve(async (req) => {
         }
 
     } else if (conversation.platform === 'whatsapp') {
-        // Fonnte API — no "Bearer" prefix, just the raw token
-        const fonnteToken = integration.access_token;
-        const targetPhone = externalId; // customer's phone number
+        const phoneNumberId = integration.provider_account_id;
+        const targetPhone = externalId;
+        const waUrl = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+        const waHeaders = {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        };
 
-        // Send image if present
         if (mediaUrl) {
-            const mediaForm = new URLSearchParams();
-            mediaForm.append('target', targetPhone);
-            mediaForm.append('message', content || '');
-            mediaForm.append('url', mediaUrl);
-            mediaForm.append('filename', 'image');
-            mediaForm.append('type_bot', 'False');
-
-            const mediaRes = await fetch('https://api.fonnte.com/send', {
+            // Send image with optional caption in one call
+            const mediaPayload = {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: targetPhone,
+                type: 'image',
+                image: { link: mediaUrl, caption: content || '' },
+            };
+            const mediaRes = await fetch(waUrl, {
                 method: 'POST',
-                headers: {
-                    'Authorization': fonnteToken,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: mediaForm.toString(),
+                headers: waHeaders,
+                body: JSON.stringify(mediaPayload),
             });
             const mediaJson = await mediaRes.json();
-            if (!mediaJson.status) throw new Error(mediaJson.reason || 'Fonnte failed to send media');
-            metaResponse = { message_id: mediaJson.id };
+            if (mediaJson.error) throw new Error(mediaJson.error.message || 'Meta WA failed to send media');
+            metaResponse = { message_id: mediaJson.messages?.[0]?.id };
         } else if (content && content.trim() !== '') {
-            // Text only
-            const textForm = new URLSearchParams();
-            textForm.append('target', targetPhone);
-            textForm.append('message', content);
-            textForm.append('type_bot', 'False');
-
-            const textRes = await fetch('https://api.fonnte.com/send', {
+            const textPayload = {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: targetPhone,
+                type: 'text',
+                text: { body: content },
+            };
+            const textRes = await fetch(waUrl, {
                 method: 'POST',
-                headers: {
-                    'Authorization': fonnteToken,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: textForm.toString(),
+                headers: waHeaders,
+                body: JSON.stringify(textPayload),
             });
             const textJson = await textRes.json();
-            if (!textJson.status) throw new Error(textJson.reason || 'Fonnte failed to send message');
-            metaResponse = { message_id: textJson.id };
+            if (textJson.error) throw new Error(textJson.error.message || 'Meta WA failed to send message');
+            metaResponse = { message_id: textJson.messages?.[0]?.id };
         }
 
     } else {

@@ -23,24 +23,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loadingRole, setLoadingRole] = useState(true);
   
-  // Track the last processed user to prevent unnecessary re-fetches on tab focus
   const lastProcessedUserId = useRef<string | null>(null);
 
   const fetchUserRole = useCallback(async () => {
-    // 1. OPTIMIZATION: If the user ID hasn't changed, don't wipe the state.
-    // This prevents the "flash" when switching tabs.
     if (user?.id === lastProcessedUserId.current) {
         return;
     }
-
-    // 2. CRITICAL FIX: Set loading TRUE before clearing roles.
-    // This prevents RoleGuard from seeing "role: null" and showing Access Denied.
     setLoadingRole(true);
     
-    // Update the ref
     lastProcessedUserId.current = user?.id || null;
 
-    // Reset permissions
     setIsSuperAdmin(false);
     setRole(null);
     setCurrentOrgId(null);

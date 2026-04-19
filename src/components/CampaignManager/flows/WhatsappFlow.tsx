@@ -44,7 +44,7 @@ const WhatsappFlow: React.FC<WhatsappFlowProps> = ({ data, onChange, title = '',
                 .limit(1)
                 .maybeSingle();
 
-            if (integError || !integData) throw new Error("WhatsApp (Fonnte) not connected. Go to Integrations → WhatsApp.");
+            if (integError || !integData) throw new Error("WhatsApp not connected. Go to Integrations → WhatsApp.");
 
             const cleanPhone = String(integData.provider_account_id || '').replace(/\D/g, '');
             setConnection({
@@ -76,7 +76,7 @@ const WhatsappFlow: React.FC<WhatsappFlowProps> = ({ data, onChange, title = '',
         </ThemeIcon>
         <div>
             <Text fw={600} size="sm" c="blue">WhatsApp Configuration</Text>
-            <Text size="xs" c="dimmed">Broadcast via Fonnte (no Meta templates)</Text>
+            <Text size="xs" c="dimmed">Broadcast via Meta WhatsApp Cloud API</Text>
         </div>
       </Group>
 

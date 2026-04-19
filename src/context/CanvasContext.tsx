@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react';
-// FIX: Import specific classes
 import { Canvas, Object as FabricObject } from 'fabric';
 
 export interface CanvasContextType {
-  // FIX: Update types
   canvas: Canvas | null;
   selectedObject: FabricObject | null;
+  zoom: number;
+  setZoom: (zoom: number) => void;
 }
 
 export const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
