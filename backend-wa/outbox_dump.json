@@ -1,0 +1,52 @@
+[
+  {
+    "id": 35,
+    "phone": "6281249494376",
+    "status": "failed",
+    "organization_id": "5a5ff513-96e5-4517-a8cb-e484e368f5bd",
+    "response_data": {
+      "error": "Request failed with status code 400"
+    },
+    "created_at": "2026-04-02T16:28:56.367792+00:00"
+  },
+  {
+    "id": 33,
+    "phone": "628813570288",
+    "status": "failed",
+    "organization_id": null,
+    "response_data": {
+      "error": "Missing organization_id"
+    },
+    "created_at": "2026-03-27T10:37:09.718134+00:00"
+  },
+  {
+    "id": 32,
+    "phone": "6281249494376",
+    "status": "failed",
+    "organization_id": null,
+    "response_data": {
+      "error": "Missing organization_id"
+    },
+    "created_at": "2026-03-27T10:37:09.718134+00:00"
+  },
+  {
+    "id": 31,
+    "phone": "6281249494376",
+    "status": "failed",
+    "organization_id": null,
+    "response_data": {
+      "error": "Missing organization_id"
+    },
+    "created_at": "2026-03-27T10:29:35.2672+00:00"
+  },
+  {
+    "id": 30,
+    "phone": "6281249494376",
+    "status": "failed",
+    "organization_id": null,
+    "response_data": {
+      "error": "Missing organization_id"
+    },
+    "created_at": "2026-03-27T10:29:35.2672+00:00"
+  }
+]

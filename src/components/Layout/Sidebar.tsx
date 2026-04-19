@@ -43,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<string | null>('layers');
+  const [activeTab, setActiveTab] = useState<string | null>('elements');
   const [isGenerating, setIsGenerating] = useState(false);
   const { canvas, selectedObject } = useFabricCanvas();
   const notify = useNotification(); 

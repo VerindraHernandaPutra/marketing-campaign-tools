@@ -1,58 +1,134 @@
-// Follow this setup guide to deploy: https://supabase.com/docs/guides/functions/deploy
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // Supabase-js may send additional headers during preflight.
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, accept-language, cache-control, pragma',
+};
 
 interface EmailPayload {
   from: string;
   to: string[];
   subject: string;
   html: string;
-  reply_to: string;
+  reply_to?: string;
   scheduled_at?: string;
+  tags?: { name: string; value: string }[];
   attachments?: {
     filename: string;
-    content: string; // FIX: Keep as string (Base64) for raw API calls
+    content: string;
     content_id?: string;
     disposition?: string;
   }[];
 }
 
 serve(async (req: Request) => {
-  // Handle CORS for browser requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { to, subject, html, from, scheduledAt, attachments } = await req.json()
-    
-    console.log("Backend received request:", { to, scheduledAt, hasAttachments: attachments?.length > 0 });
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Missing Authorization header");
 
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    if (!resendApiKey) throw new Error('Missing Resend API Key')
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Authenticate the calling user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (authError || !user) throw new Error("Unauthorized");
+
+    const { to, subject, html, scheduledAt, attachments, organizationId, campaignId } = await req.json();
+    
+    console.log("send-email received:", { to, subject, hasAttachments: !!attachments?.length, organizationId, campaignId });
+
+    if (!to || !subject || !html) {
+      throw new Error("Missing required fields: to, subject, html");
+    }
+
+    // --- Fetch Resend API key from the organization's integration settings ---
+    let resendApiKey: string | null = null;
+    let fromAddress = "onboarding@resend.dev"; // fallback test sender
+
+    // First try fetching organization-specific key
+    if (organizationId) {
+      // Authorize: caller must be a member of the organization they're trying to use.
+      // (This function uses the service role key which bypasses RLS.)
+      const { data: membership, error: membershipError } = await supabase
+        .from("organization_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("organization_id", organizationId)
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError) throw membershipError;
+      if (!membership) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+
+      const { data: integration } = await supabase
+        .from("organization_integrations")
+        .select("access_token, metadata")
+        .eq("organization_id", organizationId)
+        .eq("platform", "resend")
+        .limit(1)
+        .single();
+
+      if (integration) {
+        resendApiKey = integration.access_token;
+        if (integration.metadata?.from_email && integration.metadata?.from_name) {
+          fromAddress = `${integration.metadata.from_name} <${integration.metadata.from_email}>`;
+        } else if (integration.metadata?.from_email) {
+          fromAddress = integration.metadata.from_email;
+        }
+      }
+    }
+
+    // Fall back to environment variable (set via `supabase secrets set RESEND_API_KEY=...`)
+    if (!resendApiKey) {
+      resendApiKey = Deno.env.get("RESEND_API_KEY") || null;
+    }
+
+    if (!resendApiKey) {
+      throw new Error("No Resend API Key configured. Please connect Resend in Platform → Resend (Email) settings.");
+    }
 
     const payload: EmailPayload = {
-      from: 'onboarding@resend.dev',
-      to: [to],
-      subject: subject,
-      html: html,
-      reply_to: from,
+      from: fromAddress,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
     };
+
+    // Add campaign-aware tags so webhook events can be mapped back to campaign rows.
+    const resendTags: { name: string; value: string }[] = [];
+    if (campaignId) {
+      resendTags.push({ name: "campaign_id", value: String(campaignId) });
+    }
+    if (organizationId) {
+      resendTags.push({ name: "organization_id", value: String(organizationId) });
+    }
+    if (resendTags.length > 0) {
+      payload.tags = resendTags;
+    }
 
     if (scheduledAt) {
       payload.scheduled_at = scheduledAt;
     }
 
     if (attachments && attachments.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       payload.attachments = attachments.map((att: any) => ({
         filename: att.filename.replace(/[^a-zA-Z0-9.-]/g, '_'),
-        // FIX: Send the Base64 string directly. Do NOT convert to Buffer for the raw API.
-        content: att.content, 
+        content: att.content,
         content_id: att.content_id,
         disposition: 'inline',
       }));
@@ -65,25 +141,56 @@ serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-    })
+    });
 
-    const data = await response.json()
+    const data = await response.json();
 
     if (!response.ok) {
       console.error("Resend API Error:", data);
-      throw new Error(data.message || 'Failed to send email')
+      throw new Error(data.message || 'Failed to send email via Resend');
+    }
+
+    console.log("Email sent successfully:", data.id);
+
+    // Persist event for analytics attribution (best-effort).
+    const eventType = scheduledAt ? "scheduled" : "sent";
+    const recipient = Array.isArray(payload.to) ? payload.to[0] : payload.to;
+    const { error: eventError } = await supabase
+      .from("email_events")
+      .insert({
+        email_id: data.id || crypto.randomUUID(),
+        type: eventType,
+        recipient: recipient || "unknown",
+        campaign_id: campaignId || null,
+      });
+    if (eventError) {
+      console.error("Failed to persist email_events row:", eventError);
+    }
+
+    // Keep campaign status in sync with provider acceptance in an event-driven friendly way.
+    if (campaignId) {
+      const campaignStatus = scheduledAt ? "scheduled" : "sent";
+      const { error: campaignUpdateError } = await supabase
+        .from("marketing_campaigns")
+        .update({ status: campaignStatus })
+        .eq("id", campaignId);
+
+      if (campaignUpdateError) {
+        console.error("Failed to update campaign status:", campaignUpdateError);
+      }
     }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
+    });
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("send-email error:", errorMessage);
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
-    })
+    });
   }
-})
+});

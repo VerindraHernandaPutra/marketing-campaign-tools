@@ -12,7 +12,7 @@ export const whatsappService = {
     /**
      * Queues a message to be sent via the WhatsApp Gateway
      */
-    async queueMessage(phone: string, message: string = 'hello_world') {
+    async queueMessage(phone: string, organizationId: string, message: string = 'hello_world') {
         // Ensure phone number has country code but no '+' if existing logic prefers that,
         // though usually Supabase stores it as is.
         // Clean string: remove non-digits
@@ -22,6 +22,7 @@ export const whatsappService = {
             .from('whatsapp_outbox')
             .insert([
                 {
+                    organization_id: organizationId,
                     phone: cleanPhone,
                     message,
                     status: 'scheduling'

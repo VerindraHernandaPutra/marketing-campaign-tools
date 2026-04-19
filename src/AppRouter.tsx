@@ -1,5 +1,5 @@
 // [cite: src/AppRouter.tsx]
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App } from './App';
 import Dashboard from './pages/Dashboard';
 import CampaignManager from './pages/CampaignManager';
@@ -20,18 +20,29 @@ import OrganizationDetails from './pages/OrganizationDetails';
 import { LoginPage } from './pages/LoginPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleGuard } from './components/Auth/RoleGuard';
-import Integrations from './pages/Integrations';
+import IntegrationsWhatsApp from './pages/IntegrationsWhatsApp';
+import IntegrationsInstagram from './pages/IntegrationsInstagram';
+import IntegrationsMessenger from './pages/IntegrationsMessenger';
+import IntegrationsResend from './pages/IntegrationsResend';
+import Inbox from './pages/Inbox';
+import WhatsAppTemplates from './pages/WhatsAppTemplates';
+import MetaOAuthCallback from './pages/MetaOAuthCallback';
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/integrations/meta-callback" element={<MetaOAuthCallback />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/integrations/whatsapp" element={<IntegrationsWhatsApp />} />
+          <Route path="/integrations/instagram" element={<IntegrationsInstagram />} />
+          <Route path="/integrations/messenger" element={<IntegrationsMessenger />} />
+          <Route path="/integrations/resend" element={<IntegrationsResend />} />
+          <Route path="/integrations" element={<Navigate to="/integrations/messenger" replace />} />
 
           {/* SUPER ADMIN */}
           <Route element={<RoleGuard allowedRoles={['admin']} />}>
@@ -61,12 +72,14 @@ export function AppRouter() {
 
           {/* MARKETER & OPERATOR */}
           <Route element={<RoleGuard allowedRoles={['marketer', 'operator']} />}>
+            <Route path="/inbox" element={<Inbox />} />
             <Route path="/campaign-manager" element={<CampaignManager />} />
             <Route path="/campaign-manager/new" element={<CampaignCreate />} />
             <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
             <Route path="/scheduled" element={<ScheduledPosts />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/wa-test" element={<WhatsAppTest />} />
+            <Route path="/wa-templates" element={<WhatsAppTemplates />} />
             {/* Marketers can also view campaign designs */}
             <Route path="/campaigns" element={<Campaigns />} />
           </Route>

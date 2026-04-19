@@ -1,238 +1,382 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Paper, Group, Select, TextInput, Loader, SimpleGrid, 
-  Text, Box, SegmentedControl, Tooltip, Table, Badge, ActionIcon, Menu, Center
+import {
+  Box, Group, Text, Badge, Paper, SimpleGrid, Loader, Center,
+  ThemeIcon, ActionIcon, Tooltip, Select, TextInput, Table,
+  Modal, Stack, Divider, Button, Avatar, ScrollArea
 } from '@mantine/core';
-import { 
-  SearchIcon, GridIcon, ListIcon, MoreVerticalIcon, 
-  EditIcon, TrashIcon, CalendarIcon 
+import {
+  SearchIcon, EditIcon, TrashIcon, SendIcon, CalendarIcon,
+  ClockIcon, CheckCircleIcon, XCircleIcon, FileTextIcon,
+  RocketIcon, MailIcon, MessageCircleIcon, RefreshCwIcon, EyeIcon
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
-import { useAuth } from '../../auth/useAuth';
+import { useUserRole } from '../../auth/UserContext';
 import { useNavigate } from 'react-router-dom';
-import DesignCard from '../Dashboard/DesignCard';
 
-interface ScheduledPost {
+interface Campaign {
   id: string;
   title: string;
-  platforms: string[];
-  scheduled_date: string;
-  status: string;
   content: string;
-  platform_data?: {
-    media?: string[];
-  };
-  updated_at?: string;
+  platforms: string[];
+  scheduled_date: string | null;
+  status: string;
+  created_at: string;
+  platform_data?: { media?: string[] };
 }
 
-const ScheduledList: React.FC = () => {
-  const { user } = useAuth();
+interface Stats {
+  total: number;
+  scheduled: number;
+  sent: number;
+  draft: number;
+  failed: number;
+}
+
+const PLATFORM_META: Record<string, { label: string; color: string; emoji: string }> = {
+  email:     { label: 'Email',     color: '#EA4335', emoji: '📧' },
+  whatsapp:  { label: 'WhatsApp', color: '#25D366', emoji: '💬' },
+  facebook:  { label: 'Facebook', color: '#1877F2', emoji: '📘' },
+  instagram: { label: 'Instagram',color: '#E4405F', emoji: '📸' },
+  twitter:   { label: 'Twitter',  color: '#1DA1F2', emoji: '🐦' },
+  linkedin:  { label: 'LinkedIn', color: '#0A66C2', emoji: '💼' },
+};
+
+const STATUS_META: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+  sent:       { color: 'teal',   icon: <CheckCircleIcon size={14} />,  label: 'Sent'      },
+  scheduled:  { color: 'blue',   icon: <ClockIcon size={14} />,        label: 'Scheduled' },
+  draft:      { color: 'gray',   icon: <FileTextIcon size={14} />,     label: 'Draft'     },
+  failed:     { color: 'red',    icon: <XCircleIcon size={14} />,      label: 'Failed'    },
+  scheduling: { color: 'orange', icon: <RocketIcon size={14} />,       label: 'Processing'},
+};
+
+// ─────────────── STAT CARD ───────────────
+const StatCard: React.FC<{
+  icon: React.ReactNode; value: number; label: string;
+  color: string; active?: boolean; onClick?: () => void;
+}> = ({ icon, value, label, color, active, onClick }) => (
+  <Paper
+    shadow={active ? 'md' : 'xs'}
+    p="md"
+    radius="lg"
+    withBorder
+    onClick={onClick}
+    style={{
+      cursor: onClick ? 'pointer' : 'default',
+      border: active ? `2px solid var(--mantine-color-${color}-5)` : '1px solid #e9ecef',
+      background: active ? `var(--mantine-color-${color}-0)` : '#fff',
+      transition: 'all 0.2s ease',
+    }}
+  >
+    <Group gap="sm">
+      <ThemeIcon color={color} variant="light" size="lg" radius="md">
+        {icon}
+      </ThemeIcon>
+      <Box>
+        <Text fw={700} size="xl" lh={1}>{value}</Text>
+        <Text size="xs" c="dimmed">{label}</Text>
+      </Box>
+    </Group>
+  </Paper>
+);
+
+// ─────────────── CAMPAIGN DETAIL MODAL ───────────────
+const CampaignDetailModal: React.FC<{
+  campaign: Campaign | null;
+  onClose: () => void;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+}> = ({ campaign, onClose, onEdit, onDelete }) => {
+  if (!campaign) return null;
+  const sm = STATUS_META[campaign.status] || STATUS_META.draft;
+
+  return (
+    <Modal opened={!!campaign} onClose={onClose} centered title="Campaign Details" size="md"
+      styles={{ content: { borderRadius: 16 } }}
+    >
+      <Stack gap="md">
+        <Group justify="space-between" align="flex-start">
+          <Box style={{ flex: 1 }}>
+            <Text fw={700} size="lg">{campaign.title}</Text>
+            <Group gap={6} mt={4}>
+              <Badge color={sm.color} leftSection={sm.icon} variant="light" size="sm">
+                {sm.label}
+              </Badge>
+              {campaign.platforms?.map(p => (
+                <Badge key={p} size="sm" variant="outline"
+                  style={{ color: PLATFORM_META[p]?.color, borderColor: PLATFORM_META[p]?.color }}>
+                  {PLATFORM_META[p]?.emoji} {PLATFORM_META[p]?.label || p}
+                </Badge>
+              ))}
+            </Group>
+          </Box>
+        </Group>
+
+        <Divider />
+
+        <Box p="sm" style={{ background: '#f8f9fa', borderRadius: 8 }}>
+          <Text size="xs" fw={600} c="dimmed" mb={4}>CONTENT PREVIEW</Text>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            {campaign.content || 'No content.'}
+          </Text>
+        </Box>
+
+        {campaign.scheduled_date && (
+          <Group gap="xs" p="sm" style={{ background: '#e7f5ff', borderRadius: 8 }}>
+            <CalendarIcon size={16} color="#228be6" />
+            <Text size="sm">
+              <strong>Scheduled:</strong> {new Date(campaign.scheduled_date).toLocaleString()}
+            </Text>
+          </Group>
+        )}
+
+        <Group gap="xs" p="sm" style={{ background: '#f8f9fa', borderRadius: 8 }}>
+          <ClockIcon size={16} color="#868e96" />
+          <Text size="sm" c="dimmed">
+            Created: {new Date(campaign.created_at).toLocaleDateString()}
+          </Text>
+        </Group>
+
+        <Group mt="sm">
+          <Button flex={1} variant="light" color="blue"
+            leftSection={<EditIcon size={14} />} onClick={() => { onClose(); onEdit(campaign.id); }}>
+            Edit
+          </Button>
+          <Button flex={1} variant="light" color="red"
+            leftSection={<TrashIcon size={14} />} onClick={() => onDelete(campaign.id)}>
+            Delete
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+};
+
+// ─────────────── MAIN LIST COMPONENT ───────────────
+const CampaignHistoryList: React.FC = () => {
+  const { currentOrgId } = useUserRole();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string | null>('all');
   const [platformFilter, setPlatformFilter] = useState<string | null>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [stats, setStats] = useState<Stats>({ total: 0, scheduled: 0, sent: 0, draft: 0, failed: 0 });
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
 
-  const fetchPosts = useCallback(async () => {
-    if (!user) return;
+  const reconcileScheduledCampaigns = useCallback(async (rows: Campaign[]) => {
+    const nowTs = Date.now();
+    const overdueIds = rows
+      .filter((row) => row.status === 'scheduled' && row.scheduled_date && new Date(row.scheduled_date).getTime() <= nowTs)
+      .map((row) => row.id);
+
+    if (overdueIds.length === 0) return rows;
+
+    const { error } = await supabase
+      .from('marketing_campaigns')
+      .update({ status: 'sent' })
+      .in('id', overdueIds)
+      .eq('status', 'scheduled');
+
+    if (error) return rows;
+
+    return rows.map((row) => overdueIds.includes(row.id) ? { ...row, status: 'sent' } : row);
+  }, []);
+
+  const fetchCampaigns = useCallback(async () => {
+    if (!currentOrgId) return;
     setLoading(true);
-
     const { data, error } = await supabase
       .from('marketing_campaigns')
       .select('*')
-      .eq('user_id', user.id)
-      .not('scheduled_date', 'is', null)
-      .order('scheduled_date', { ascending: true });
+      .eq('organization_id', currentOrgId)
+      .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching scheduled posts:', error);
-    } else if (data) {
-      setPosts(data);
+    if (!error && data) {
+      const reconciled = await reconcileScheduledCampaigns(data as Campaign[]);
+      setCampaigns(reconciled);
+      setStats({
+        total: reconciled.length,
+        scheduled: reconciled.filter(c => c.status === 'scheduled').length,
+        sent: reconciled.filter(c => c.status === 'sent').length,
+        draft: reconciled.filter(c => c.status === 'draft').length,
+        failed: reconciled.filter(c => c.status === 'failed').length,
+      });
     }
     setLoading(false);
-  }, [user]);
+  }, [currentOrgId, reconcileScheduledCampaigns]);
 
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+  useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to cancel this scheduled post?')) {
-      const { error } = await supabase.from('marketing_campaigns').delete().eq('id', id);
-      if (!error) fetchPosts();
-    }
+    if (!confirm('Delete this campaign?')) return;
+    await supabase.from('marketing_campaigns').delete().eq('id', id);
+    setSelectedCampaign(null);
+    fetchCampaigns();
   };
 
-  const getPlatformColor = (platform: string) => {
-    const colors: Record<string, string> = {
-      whatsapp: 'green',
-      email: 'red',
-      facebook: 'blue',
-      instagram: 'pink',
-      twitter: 'cyan',
-      linkedin: 'indigo'
-    };
-    return colors[platform] || 'gray';
-  };
-
-  const getStatusColor = (status: string) => {
-     if (status === 'sent') return 'green';
-     if (status === 'failed') return 'red';
-     return 'blue'; // scheduled
-  };
-
-  // Client-side filtering
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          post.content?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPlatform = platformFilter === 'all' || !platformFilter || post.platforms?.includes(platformFilter);
-    
-    return matchesSearch && matchesPlatform;
+  const filtered = campaigns.filter(c => {
+    const matchSearch = c.title?.toLowerCase().includes(search.toLowerCase()) ||
+      c.content?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = !statusFilter || statusFilter === 'all' || c.status === statusFilter;
+    const matchStatFilter = !activeStatFilter || c.status === activeStatFilter;
+    const matchPlatform = !platformFilter || platformFilter === 'all' || c.platforms?.includes(platformFilter);
+    return matchSearch && matchStatus && matchStatFilter && matchPlatform;
   });
+
+  const handleStatClick = (key: string) => {
+    setActiveStatFilter(prev => prev === key ? null : key);
+    setStatusFilter('all');
+  };
 
   return (
     <Box>
-      <Group justify="space-between" mb="lg">
-        <Group>
-            <TextInput 
-            placeholder="Search scheduled posts..." 
-            leftSection={<SearchIcon size={16} />} 
-            value={searchQuery} 
-            onChange={e => setSearchQuery(e.currentTarget.value)} 
-            w={300} 
-            />
-            <Select 
-            placeholder="Filter by platform" 
-            value={platformFilter} 
-            onChange={setPlatformFilter} 
-            data={[
-                { value: 'all', label: 'All Platforms' },
-                { value: 'facebook', label: 'Facebook' },
-                { value: 'instagram', label: 'Instagram' },
-                { value: 'twitter', label: 'Twitter' },
-                { value: 'email', label: 'Email' },
-                { value: 'whatsapp', label: 'WhatsApp' },
-                { value: 'linkedin', label: 'LinkedIn' }
-            ]} 
-            w={200} 
-            />
-        </Group>
+      {/* Stats Row */}
+      <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} mb="xl">
+        <StatCard icon={<RocketIcon size={18} />} value={stats.total} label="Total Campaigns" color="violet"
+          active={!activeStatFilter} onClick={() => setActiveStatFilter(null)} />
+        <StatCard icon={<ClockIcon size={18} />} value={stats.scheduled} label="Scheduled" color="blue"
+          active={activeStatFilter === 'scheduled'} onClick={() => handleStatClick('scheduled')} />
+        <StatCard icon={<CheckCircleIcon size={18} />} value={stats.sent} label="Sent" color="teal"
+          active={activeStatFilter === 'sent'} onClick={() => handleStatClick('sent')} />
+        <StatCard icon={<FileTextIcon size={18} />} value={stats.draft} label="Drafts" color="gray"
+          active={activeStatFilter === 'draft'} onClick={() => handleStatClick('draft')} />
+        <StatCard icon={<XCircleIcon size={18} />} value={stats.failed} label="Failed" color="red"
+          active={activeStatFilter === 'failed'} onClick={() => handleStatClick('failed')} />
+      </SimpleGrid>
 
-        <SegmentedControl 
-            value={viewMode}
-            onChange={(val) => setViewMode(val as 'grid' | 'list')}
+      {/* Filters Row */}
+      <Group mb="lg" justify="space-between">
+        <Group gap="sm">
+          <TextInput
+            placeholder="Search campaigns..."
+            leftSection={<SearchIcon size={15} />}
+            value={search}
+            onChange={e => setSearch(e.currentTarget.value)}
+            w={240}
+            radius="md"
+          />
+          <Select
+            placeholder="Status"
+            value={statusFilter}
+            onChange={setStatusFilter}
             data={[
-                { label: <Tooltip label="Grid View"><GridIcon size={16}/></Tooltip>, value: 'grid' },
-                { label: <Tooltip label="List View"><ListIcon size={16}/></Tooltip>, value: 'list' },
+              { value: 'all', label: 'All Status' },
+              { value: 'sent', label: '✅ Sent' },
+              { value: 'scheduled', label: '📅 Scheduled' },
+              { value: 'draft', label: '📝 Draft' },
+              { value: 'failed', label: '❌ Failed' },
             ]}
-        />
+            w={160}
+            radius="md"
+          />
+          <Select
+            placeholder="Platform"
+            value={platformFilter}
+            onChange={setPlatformFilter}
+            data={[
+              { value: 'all', label: 'All Platforms' },
+              ...Object.entries(PLATFORM_META).map(([k, v]) => ({ value: k, label: `${v.emoji} ${v.label}` }))
+            ]}
+            w={160}
+            radius="md"
+          />
+        </Group>
+        <Tooltip label="Refresh">
+          <ActionIcon variant="light" color="gray" onClick={fetchCampaigns}>
+            <RefreshCwIcon size={15} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
+      {/* Table */}
       {loading ? (
         <Center h={200}><Loader /></Center>
+      ) : filtered.length === 0 ? (
+        <Center h={200}>
+          <Stack align="center" gap="xs">
+            <CalendarIcon size={40} color="#dee2e6" />
+            <Text c="dimmed" size="sm">No campaigns match the current filters.</Text>
+          </Stack>
+        </Center>
       ) : (
-        <>
-          {filteredPosts.length === 0 ? (
-            <Text c="dimmed" ta="center" mt="xl">No scheduled posts found.</Text>
-          ) : (
-            viewMode === 'grid' ? (
-                // GRID VIEW
-                <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
-                {filteredPosts.map(post => {
-                    const thumbnail = post.platform_data?.media?.[0] || null;
-                    const statusTag = post.status.charAt(0).toUpperCase() + post.status.slice(1);
-                    const platformTags = post.platforms.map(p => p.charAt(0).toUpperCase() + p.slice(1));
-                    const tags = [statusTag, ...platformTags];
+        <ScrollArea>
+          <Table striped highlightOnHover verticalSpacing="sm" withTableBorder radius="lg">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Campaign</Table.Th>
+                <Table.Th>Platforms</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Date</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filtered.map(c => {
+                const sm = STATUS_META[c.status] || STATUS_META.draft;
+                const dateLabel = c.scheduled_date
+                  ? new Date(c.scheduled_date).toLocaleDateString()
+                  : new Date(c.created_at).toLocaleDateString();
 
-                    return (
-                    <DesignCard 
-                        key={post.id}
-                        design={{
-                        id: post.id,
-                        title: post.title,
-                        thumbnail: thumbnail,
-                        updated_at: post.scheduled_date,
-                        canvas_data: null,
-                        tags: tags
-                        }}
-                        isTemplate={false}
-                        onRefresh={fetchPosts}
-                    />
-                    );
-                })}
-                </SimpleGrid>
-            ) : (
-                // TABLE VIEW
-                <Paper shadow="sm" withBorder>
-                    <Table striped highlightOnHover verticalSpacing="sm">
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>Campaign Title</Table.Th>
-                                <Table.Th>Platforms</Table.Th>
-                                <Table.Th>Scheduled For</Table.Th>
-                                <Table.Th>Status</Table.Th>
-                                <Table.Th align="right">Actions</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {filteredPosts.map(post => (
-                                <Table.Tr key={post.id}>
-                                    <Table.Td>
-                                        <Text fw={500}>{post.title}</Text>
-                                        <Text size="xs" c="dimmed" lineClamp={1}>{post.content}</Text>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Group gap="xs">
-                                            {post.platforms && post.platforms.map(p => (
-                                                <Badge key={p} color={getPlatformColor(p)} variant="light" size="sm">
-                                                {p}
-                                                </Badge>
-                                            ))}
-                                        </Group>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Group gap="xs">
-                                            <CalendarIcon size={14} />
-                                            <Text size="sm">{new Date(post.scheduled_date).toLocaleString()}</Text>
-                                        </Group>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Badge color={getStatusColor(post.status)} variant="dot">
-                                            {post.status?.toUpperCase()}
-                                        </Badge>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Group justify="flex-end">
-                                            <Menu shadow="md" width={200}>
-                                                <Menu.Target>
-                                                    <ActionIcon variant="subtle" color="gray">
-                                                        <MoreVerticalIcon size={16} />
-                                                    </ActionIcon>
-                                                </Menu.Target>
-                                                <Menu.Dropdown>
-                                                    <Menu.Item leftSection={<EditIcon size={14} />} onClick={() => navigate(`/campaign-manager/edit/${post.id}`)}>
-                                                        Edit Campaign
-                                                    </Menu.Item>
-                                                    <Menu.Divider />
-                                                    <Menu.Item leftSection={<TrashIcon size={14} />} color="red" onClick={() => handleDelete(post.id)}>
-                                                        Delete
-                                                    </Menu.Item>
-                                                </Menu.Dropdown>
-                                            </Menu>
-                                        </Group>
-                                    </Table.Td>
-                                </Table.Tr>
-                            ))}
-                        </Table.Tbody>
-                    </Table>
-                </Paper>
-            )
-          )}
-        </>
+                return (
+                  <Table.Tr key={c.id} style={{ cursor: 'pointer' }}>
+                    <Table.Td onClick={() => setSelectedCampaign(c)}>
+                      <Group gap="sm">
+                        <Avatar size="sm" radius="md" color="blue">
+                          {c.title?.[0]?.toUpperCase() || '?'}
+                        </Avatar>
+                        <Box>
+                          <Text fw={600} size="sm" lineClamp={1}>{c.title}</Text>
+                          <Text size="xs" c="dimmed" lineClamp={1}>{c.content}</Text>
+                        </Box>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td onClick={() => setSelectedCampaign(c)}>
+                      <Group gap={4}>
+                        {c.platforms?.slice(0, 3).map(p => (
+                          <Tooltip key={p} label={PLATFORM_META[p]?.label || p}>
+                            <Text size="sm">{PLATFORM_META[p]?.emoji || '📣'}</Text>
+                          </Tooltip>
+                        ))}
+                        {(c.platforms?.length || 0) > 3 && (
+                          <Text size="xs" c="dimmed">+{(c.platforms?.length || 0) - 3}</Text>
+                        )}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td onClick={() => setSelectedCampaign(c)}>
+                      <Badge color={sm.color} leftSection={sm.icon} variant="light" size="sm">
+                        {sm.label}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td onClick={() => setSelectedCampaign(c)}>
+                      <Group gap={4}>
+                        {c.scheduled_date ? <CalendarIcon size={12} color="#228be6" /> : <ClockIcon size={12} color="#868e96" />}
+                        <Text size="xs">{dateLabel}</Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs">
+                        <Tooltip label="View"><ActionIcon variant="subtle" color="gray" onClick={() => setSelectedCampaign(c)}><EyeIcon size={15} /></ActionIcon></Tooltip>
+                        <Tooltip label="Edit"><ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/campaign-manager/edit/${c.id}`)}><EditIcon size={15} /></ActionIcon></Tooltip>
+                        <Tooltip label="Delete"><ActionIcon variant="subtle" color="red" onClick={() => handleDelete(c.id)}><TrashIcon size={15} /></ActionIcon></Tooltip>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
       )}
+
+      <CampaignDetailModal
+        campaign={selectedCampaign}
+        onClose={() => setSelectedCampaign(null)}
+        onEdit={(id) => navigate(`/campaign-manager/edit/${id}`)}
+        onDelete={handleDelete}
+      />
     </Box>
   );
 };
 
-export default ScheduledList;
+export default CampaignHistoryList;

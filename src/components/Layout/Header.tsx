@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Group, ActionIcon, Button, Divider, Menu, useMantineColorScheme, 
-  Box, TextInput, Tooltip, useMantineTheme, Text, Modal, Image, Center
+  Box, TextInput, Tooltip, useMantineTheme, Text, Modal, Image, Center, Badge
 } from '@mantine/core';
 import { 
   ArrowLeft, Download, Undo2, Redo2, Moon, Sun, Cloud, FileType, LayoutTemplate,
@@ -16,6 +16,7 @@ interface HeaderProps {
   propertiesPanelOpened: boolean;
   onTogglePropertiesPanel: () => void;
   projectTitle: string;
+  isTemplate?: boolean;
   onUpdateTitle: (newTitle: string) => void;
   onSave: () => void;
   onToggleResizeModal: () => void;
@@ -34,6 +35,7 @@ const Header: React.FC<HeaderProps> = ({
   propertiesPanelOpened,
   onTogglePropertiesPanel,
   projectTitle,
+  isTemplate,
   onUpdateTitle,
   onSave,
   onToggleResizeModal,
@@ -158,6 +160,11 @@ const Header: React.FC<HeaderProps> = ({
                     }
                   }}
                 />
+                {isTemplate !== undefined && (
+                  <Badge size="xs" variant="light" color={isTemplate ? 'grape' : 'indigo'} style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {isTemplate ? 'Template' : 'Campaign'}
+                  </Badge>
+                )}
                 <Tooltip label={saveStatus === 'saved' ? 'All changes saved' : 'Unsaved changes'}>
                   <Box className="flex items-center text-gray-400">
                       {saveStatus === 'saved' ? <Cloud size={14} /> : <div className="w-2 h-2 bg-yellow-500 rounded-full" />}

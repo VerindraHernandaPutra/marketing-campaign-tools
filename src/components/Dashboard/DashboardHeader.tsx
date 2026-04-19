@@ -4,8 +4,7 @@ import {
   Badge, Loader, TextInput, ActionIcon, Tooltip
 } from '@mantine/core';
 import {
-  UserIcon, LogOutIcon, SearchIcon, SunIcon, SidebarIcon,
-  SettingsIcon, BellIcon
+  UserIcon, LogOutIcon, SearchIcon, SunIcon, SidebarIcon
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useUserRole } from '../../auth/UserContext';
@@ -66,8 +65,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onToggleSidebar }) =>
       style={{
         borderBottom: '1px solid var(--mantine-color-gray-2)',
         backgroundColor: 'white',
-        position: 'sticky',
-        top: 0,
+        flexShrink: 0,
         zIndex: 100,
       }}
     >
@@ -89,9 +87,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onToggleSidebar }) =>
           <TextInput
             placeholder="Cari..."
             leftSection={<SearchIcon size={13} />}
-            rightSection={
-              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap', fontSize: 10 }}>⌘K</Text>
-            }
             size="xs"
             radius="md"
             w={220}
@@ -105,20 +100,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onToggleSidebar }) =>
             }}
           />
         </Group>
-
-        {/* Right: Icons + Avatar */}
+        {/* Right: Avatar */}
         <Group gap="xs">
-          <Tooltip label="Settings" withArrow position="bottom">
-            <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Settings">
-              <SettingsIcon size={15} />
-            </ActionIcon>
-          </Tooltip>
-
-          <Tooltip label="Notifications" withArrow position="bottom">
-            <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Notifications">
-              <BellIcon size={15} />
-            </ActionIcon>
-          </Tooltip>
 
           {/* Initials chip */}
           {!loadingRole ? (

@@ -5,8 +5,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   HomeIcon, LayoutIcon, ImageIcon, SendIcon, BarChartIcon,
   UsersIcon, LayersIcon, ShieldIcon, MegaphoneIcon,
-  MessageCircleIcon, InstagramIcon, MessagesSquareIcon,
-  BuildingIcon, PaletteIcon, RadioTowerIcon
+  MessageCircleIcon, InstagramIcon, MessagesSquareIcon, MessageSquareIcon,
+  BuildingIcon, PaletteIcon, RadioTowerIcon, MailIcon, CalendarIcon
 } from 'lucide-react';
 import { useUserRole } from '../../auth/UserContext';
 import { useAuth } from '../../auth/useAuth';
@@ -263,7 +263,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
           <NavItem label="Dashboard" icon={<HomeIcon size={14} />} active={isActive('/', true)} onClick={() => navigate('/')} collapsed={collapsed} />
           {canAccessMarketing && (
             <>
+              <NavItem label="Inbox" icon={<MessageCircleIcon size={14} />} active={isActive('/inbox', true)} onClick={() => navigate('/inbox')} collapsed={collapsed} />
               <NavItem label="Broadcast" icon={<SendIcon size={14} />} active={isActive('/campaign-manager')} onClick={() => navigate('/campaign-manager')} collapsed={collapsed} />
+              <NavItem label="Campaign Calendar" icon={<CalendarIcon size={14} />} active={isActive('/scheduled', true)} onClick={() => navigate('/scheduled')} collapsed={collapsed} />
+              <NavItem label="WA Templates" icon={<MessageSquareIcon size={14} />} active={isActive('/wa-templates', true)} onClick={() => navigate('/wa-templates')} collapsed={collapsed} />
               <NavItem label="Insight" icon={<BarChartIcon size={14} />} active={isActive('/analytics', true)} onClick={() => navigate('/analytics')} collapsed={collapsed} />
             </>
           )}
@@ -295,9 +298,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             <>
               {collapsed ? <Divider my={6} /> : <Divider my={8} />}
               {!collapsed && <SectionLabel>Platform</SectionLabel>}
-              <NavItem label="WhatsApp" icon={<MessageCircleIcon size={14} />} active={isActive('/integrations', true)} onClick={() => navigate('/integrations')} collapsed={collapsed} />
-              <NavItem label="Instagram" icon={<InstagramIcon size={14} />} active={false} onClick={() => navigate('/integrations')} collapsed={collapsed} />
-              <NavItem label="Messenger" icon={<MessagesSquareIcon size={14} />} active={false} onClick={() => navigate('/integrations')} collapsed={collapsed} />
+              <NavItem label="WhatsApp" icon={<MessageCircleIcon size={14} />} active={isActive('/integrations/whatsapp')} onClick={() => navigate('/integrations/whatsapp')} collapsed={collapsed} />
+              <NavItem label="Instagram" icon={<InstagramIcon size={14} />} active={isActive('/integrations/instagram')} onClick={() => navigate('/integrations/instagram')} collapsed={collapsed} />
+              <NavItem label="Messenger" icon={<MessagesSquareIcon size={14} />} active={isActive('/integrations/messenger')} onClick={() => navigate('/integrations/messenger')} collapsed={collapsed} />
+              <NavItem label="Resend (Email)" icon={<MailIcon size={14} />} active={isActive('/integrations/resend')} onClick={() => navigate('/integrations/resend')} collapsed={collapsed} />
             </>
           )}
 

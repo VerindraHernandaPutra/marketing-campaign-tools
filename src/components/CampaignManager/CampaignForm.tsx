@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image, MultiSelect } from '@mantine/core';
+import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image, MultiSelect, Badge, Avatar, ScrollArea, Divider, Stack } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import WhatsappFlow from './flows/WhatsappFlow';
 import EmailFlow from './flows/EmailFlow';
 import SocialMediaFlow from './flows/SocialMediaFlow';
 import ProjectMediaModal from './ProjectMediaModal';
+import CampaignResultModal, { CampaignResult } from './CampaignResultModal';
 
 const CampaignForm: React.FC = () => {
   const { user } = useAuth();
@@ -34,12 +35,15 @@ const CampaignForm: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [campaignResult, setCampaignResult] = useState<CampaignResult | null>(null);
 
   const [groups, setGroups] = useState<{ value: string, label: string }[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   
   const [clientsList, setClientsList] = useState<{ value: string, label: string }[]>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [groupClients, setGroupClients] = useState<{ name: string; email?: string; phone?: string; country?: string; instagram?: string; facebook?: string }[]>([]);
+  const [localMediaPreviewUrls, setLocalMediaPreviewUrls] = useState<string[]>([]);
 
 
 
@@ -66,16 +70,42 @@ const CampaignForm: React.FC = () => {
 
   useEffect(() => {
     const fetchTargets = async () => {
-      if (!currentOrgId) return;
+      if (!user) return;
       
-      const { data: gData } = await supabase.from('groups').select('id, name').eq('organization_id', currentOrgId);
+      const { data: gData } = await supabase.from('groups').select('id, name').eq('user_id', user.id);
       if (gData) setGroups(gData.map(g => ({ value: g.id, label: g.name })));
 
-      const { data: cData } = await supabase.from('clients').select('id, name, email, phone').eq('organization_id', currentOrgId);
+      const { data: cData } = await supabase.from('clients').select('id, name, email, phone').eq('user_id', user.id);
       if (cData) setClientsList(cData.map(c => ({ value: c.id, label: `${c.name} ${c.email ? `(${c.email})` : ''}` })));
     };
     fetchTargets();
   }, [currentOrgId]);
+
+  // Fetch clients from selected group for audience preview
+  useEffect(() => {
+    const fetchGroupClients = async () => {
+      if (!selectedGroupId) { setGroupClients([]); return; }
+      const { data, error } = await supabase
+        .from('client_groups')
+        .select('clients(name, email, phone, country, instagram, facebook)')
+        .eq('group_id', selectedGroupId);
+      if (!error && data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setGroupClients(data.map((item: any) => item.clients).filter(Boolean));
+      }
+    };
+    fetchGroupClients();
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    const urls = files.map((file) => URL.createObjectURL(file));
+    setLocalMediaPreviewUrls(urls);
+
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [files]);
+
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -210,7 +240,7 @@ const CampaignForm: React.FC = () => {
   const getClientsFromGroup = async (groupId: string) => {
     const { data, error } = await supabase
       .from('client_groups')
-      .select('clients(phone, email)')
+      .select('clients(phone, email, facebook_psid)')
       .eq('group_id', groupId);
 
     if (error || !data) return [];
@@ -223,7 +253,7 @@ const CampaignForm: React.FC = () => {
     if (clientIds.length === 0) return [];
     const { data, error } = await supabase
       .from('clients')
-      .select('phone, email')
+      .select('phone, email, facebook_psid')
       .in('id', clientIds);
 
     if (error || !data) return [];
@@ -232,7 +262,7 @@ const CampaignForm: React.FC = () => {
 
   // --- BACKEND INTEGRATION ---
 
-  const scheduleSocialPost = async (finalMediaList: string[]) => {
+  const scheduleSocialPost = async (finalMediaList: string[], currentCampaignId: string) => {
     // 1. Get selected platforms directly from the main state
     const platformsToPost = selectedPlatforms.filter(p =>
       ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p)
@@ -243,6 +273,8 @@ const CampaignForm: React.FC = () => {
     const { error } = await supabase
       .from('social_posts')
       .insert([{
+        campaign_id: currentCampaignId,
+        organization_id: currentOrgId,
         content: content,
         platforms: platformsToPost,
         media_urls: finalMediaList,
@@ -253,15 +285,25 @@ const CampaignForm: React.FC = () => {
     console.log("Queued Social Post for:", platformsToPost);
   };
 
-  const scheduleWhatsappMessage = async (numbers: string[], finalMediaList: string[]) => {
+  const scheduleWhatsappMessage = async (numbers: string[], finalMediaList: string[], currentCampaignId: string) => {
     if (numbers.length === 0) return;
 
+    const metadata = {
+        campaign_id: currentCampaignId,
+        title: title,
+        content: content
+    };
+
     // We insert individual rows for each number (for now, simpler for our worker)
+    const waCta = platformData.whatsapp?.ctaLink ? `\n\n${platformData.whatsapp.ctaLink}` : '';
     const rows = numbers.map(num => ({
+      campaign_id: currentCampaignId,
+      organization_id: currentOrgId,
       phone: num,
-      message: `*${title}*\n\n${content}`,
+      message: `*${title}*\n\n${content}${waCta}`, // Retained for backwards compatibility if needed
       status: 'scheduling',
-      media_urls: finalMediaList
+      media_urls: finalMediaList,
+      metadata: metadata
     }));
 
     const { error } = await supabase
@@ -272,7 +314,8 @@ const CampaignForm: React.FC = () => {
     console.log("Queued WhatsApp Messages for:", numbers.length, "recipients");
   };
 
-  const getRecipientsForPlatform = async (groupId: string | null, platformType: 'phone' | 'email'): Promise<string[]> => {
+
+  const getRecipientsForPlatform = async (groupId: string | null, platformType: 'phone' | 'email' | 'messenger'): Promise<string[]> => {
     let targets: string[] = [];
     let combinedClients: any[] = [];
     
@@ -296,7 +339,8 @@ const CampaignForm: React.FC = () => {
       targets = Array.from(new Set(targets));
     } else {
       // Manual Entry fallback
-      const input = prompt(`Enter ${platformType === 'phone' ? 'Phone Numbers' : 'Emails'} (comma separated):`);
+      const typeLabel = platformType === 'phone' ? 'Phone Numbers' : 'Emails';
+      const input = prompt(`Enter ${typeLabel} (comma separated):`);
       if (input) {
         targets = input.split(',').map(s => s.trim()).filter(s => s.length > 5);
       }
@@ -304,7 +348,7 @@ const CampaignForm: React.FC = () => {
     return targets;
   };
 
-  const sendEmail = async (forceImmediate = false) => {
+  const sendEmail = async (currentCampaignId: string, forceImmediate = false) => {
     let recipients: string[] = [];
     let combinedClients: any[] = [];
     
@@ -358,10 +402,34 @@ const CampaignForm: React.FC = () => {
         }
       }
 
-      // REMOVED: Loop for existingMedia since we are not showing inline images anymore
+      // Build rich email HTML with title as heading
+      const firstUrlMatch = (content || '').match(/https?:\/\/[^\s<]+/i);
+      const ctaUrl = firstUrlMatch?.[0] || null;
+      const linkifiedContent = (content || '')
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">$1</a>')
+        .replace(/\n/g, '<br/>');
 
-      // Updated HTML: Only sends text content. Files will appear as standard attachments.
-      const emailHtml = `<div style="font-family: sans-serif; color: #333;"><p>${content}</p></div>`;
+      const ctaLabel = (platformData.email?.ctaLabel || 'View Campaign').toString().trim() || 'View Campaign';
+      const ctaButtonHtml = ctaUrl
+        ? `
+          <div style="margin: 28px 0 20px; text-align: center;">
+            <a href="${ctaUrl}" target="_blank" rel="noopener noreferrer"
+               style="display:inline-block;padding:12px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">
+              ${ctaLabel}
+            </a>
+          </div>
+        `
+        : '';
+
+      const emailHtml = `
+        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+          ${title ? `<h2 style="color: #111; margin-bottom: 12px;">${title}</h2>` : ''}
+          <p style="line-height: 1.7; margin-bottom: 24px;">${linkifiedContent}</p>
+          ${ctaButtonHtml}
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;"/>
+          <p style="font-size: 12px; color: #aaa;">Sent via Marketing VHP Campaign Manager</p>
+        </div>
+      `;
 
       // ----------------------------------------------------------------
       // UPDATED: Robust Error Handling & Protocol Fallback
@@ -369,11 +437,12 @@ const CampaignForm: React.FC = () => {
       for (const email of recipients) {
         const payload = {
           to: email,
-          subject: emailConfig.subject || "New Campaign",
+          subject: emailConfig.subject || title || "New Campaign",
           html: emailHtml,
-          from: emailConfig.fromAddress || "Marketing Team <info@marketing.gloaicloud.com>",
           scheduledAt: scheduledAtISO,
-          attachments: attachments
+          attachments: attachments,
+          organizationId: currentOrgId,
+          campaignId: currentCampaignId,
         };
 
         // Call the Supabase Edge Function directly
@@ -391,8 +460,7 @@ const CampaignForm: React.FC = () => {
       }
       // ----------------------------------------------------------------
 
-      if (scheduledAtISO) alert(`Campaign Scheduled successfully!`);
-      else alert(`Campaign Sent successfully!`);
+      // Success feedback is handled by CampaignResultModal in handleSubmit.
 
     } catch (error: unknown) {
       console.error("Email failed:", error);
@@ -426,13 +494,12 @@ const CampaignForm: React.FC = () => {
     return uploadedUrls;
   };
 
-  const saveCampaignHistory = async (status: string) => {
-    if (!user) return;
-    const newUploadedUrls = await uploadFilesToStorage();
-    const finalMediaList = [...existingMedia, ...newUploadedUrls];
+  const upsertCampaignHistory = async (status: string, finalMediaList: string[]): Promise<string | null> => {
+    if (!user) return null;
 
     const campaignData = {
       user_id: user.id,
+      organization_id: currentOrgId,
       title: title,
       content: content,
       platforms: selectedPlatforms,
@@ -446,9 +513,13 @@ const CampaignForm: React.FC = () => {
     };
 
     if (campaignId) {
-      await supabase.from('marketing_campaigns').update(campaignData).eq('id', campaignId);
+      const { error } = await supabase.from('marketing_campaigns').update(campaignData).eq('id', campaignId);
+      if (error) throw error;
+      return campaignId;
     } else {
-      await supabase.from('marketing_campaigns').insert(campaignData);
+      const { data, error } = await supabase.from('marketing_campaigns').insert(campaignData).select('id').single();
+      if (error) throw error;
+      return data?.id || null;
     }
   };
 
@@ -456,9 +527,14 @@ const CampaignForm: React.FC = () => {
     if (action === 'draft') {
       if (!title) { alert("Title is required for draft."); return; }
       setIsSubmitting(true);
-      await saveCampaignHistory('draft');
-      setIsSubmitting(false);
-      navigate('/campaign-manager');
+      try {
+        const newUploadedUrls = await uploadFilesToStorage();
+        const finalMediaList = [...existingMedia, ...newUploadedUrls];
+        await upsertCampaignHistory('draft', finalMediaList);
+      } finally {
+        setIsSubmitting(false);
+      }
+      setCampaignResult({ type: 'draft', platforms: selectedPlatforms });
       return;
     }
 
@@ -472,36 +548,60 @@ const CampaignForm: React.FC = () => {
       // 1. Upload Media First
       const newUploadedUrls = await uploadFilesToStorage();
       const finalMediaList = [...existingMedia, ...newUploadedUrls];
+      const statusToSave = action === 'immediate' ? 'sent' : 'scheduled';
+      const currentCampaignId = await upsertCampaignHistory(statusToSave, finalMediaList);
+      if (!currentCampaignId) throw new Error('Failed to create campaign record.');
 
       if (selectedPlatforms.includes('whatsapp')) {
         const numbers = await getRecipientsForPlatform(selectedGroupId, 'phone');
         if (numbers.length > 0) {
-          await scheduleWhatsappMessage(numbers, finalMediaList);
+          await scheduleWhatsappMessage(numbers, finalMediaList, currentCampaignId);
         }
       }
+
 
       // 3. Handle Social Media (Backend-Social / Ayrshare)
       const isSocialSelected = selectedPlatforms.some(p => ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p));
       if (isSocialSelected) {
-        await scheduleSocialPost(finalMediaList);
+        await scheduleSocialPost(finalMediaList, currentCampaignId);
       }
 
       // 4. Handle Email (Legacy / Existing)
       if (selectedPlatforms.includes('email')) {
-        await sendEmail(action === 'immediate');
+        await sendEmail(currentCampaignId, action === 'immediate');
       }
 
-      // 5. Save Campaign Record
-      await saveCampaignHistory(action === 'immediate' ? 'sent' : 'scheduled');
+      // Scheduled email campaigns are accepted by provider first, then delivered later.
+      // If schedule time is already due (or past by the time user submits), reconcile to sent.
+      if (action === 'schedule' && selectedPlatforms.includes('email') && scheduledDate) {
+        const scheduleTs = new Date(scheduledDate).getTime();
+        const nowTs = Date.now();
+        if (scheduleTs <= nowTs + 60_000) {
+          await supabase
+            .from('marketing_campaigns')
+            .update({ status: 'sent' })
+            .eq('id', currentCampaignId)
+            .eq('status', 'scheduled');
+        }
+      }
 
-      alert("Campaign successfully processed!");
-      navigate('/campaign-manager');
+      setCampaignResult({
+        type: action === 'immediate' ? 'sent' : 'scheduled',
+        platforms: selectedPlatforms,
+        scheduledAt: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
+      });
 
     } catch (error: unknown) {
       console.error("Campaign Failed:", error);
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      alert(`Failed: ${msg}`);
-      await saveCampaignHistory('failed');
+      const msg = error instanceof Error ? error.message : JSON.stringify(error);
+      setCampaignResult({ type: 'error', errorMessage: msg });
+      try {
+        const newUploadedUrls = await uploadFilesToStorage();
+        const finalMediaList = [...existingMedia, ...newUploadedUrls];
+        await upsertCampaignHistory('failed', finalMediaList);
+      } catch (saveErr) {
+        console.error('Failed to persist failed campaign state:', saveErr);
+      }
     }
     setIsSubmitting(false);
   };
@@ -512,8 +612,8 @@ const CampaignForm: React.FC = () => {
   };
 
   const isStepCompleted = (step: number) => {
-    if (step === 0) return title.trim() !== '' && content.trim() !== '';
-    if (step === 1) return selectedPlatforms.length > 0;
+    if (step === 0) return selectedPlatforms.length > 0;
+    if (step === 1) return title.trim() !== '' && content.trim() !== '';
     return true;
   };
 
@@ -522,10 +622,19 @@ const CampaignForm: React.FC = () => {
   const renderFlow = () => {
     const flows = [];
     if (selectedPlatforms.includes('whatsapp')) {
-      flows.push(<WhatsappFlow key="whatsapp" data={platformData.whatsapp || {}} onChange={(data) => handlePlatformDataChange('whatsapp', data)} />);
+      flows.push(
+        <WhatsappFlow
+          key="whatsapp"
+          data={platformData.whatsapp || {}}
+          onChange={(data) => handlePlatformDataChange('whatsapp', data)}
+          title={title}
+          content={content}
+          previewMediaUrls={[...existingMedia, ...localMediaPreviewUrls]}
+        />
+      );
     }
     if (selectedPlatforms.includes('email')) {
-      flows.push(<EmailFlow key="email" data={platformData.email || {}} onChange={(data) => handlePlatformDataChange('email', data)} />);
+      flows.push(<EmailFlow key="email" data={platformData.email || {}} onChange={(data) => handlePlatformDataChange('email', data)} title={title} content={content} orgId={currentOrgId || ''} />);
     }
     if (selectedPlatforms.some((p) => ['facebook', 'instagram', 'twitter', 'linkedin'].includes(p))) {
       flows.push(<SocialMediaFlow key="social" selectedPlatforms={selectedPlatforms} />);
@@ -539,6 +648,14 @@ const CampaignForm: React.FC = () => {
 
   return (
     <>
+      {/* Campaign Result Modal */}
+      <CampaignResultModal
+        result={campaignResult}
+        onClose={() => setCampaignResult(null)}
+        onGoToManager={() => { setCampaignResult(null); navigate('/campaign-manager'); }}
+        onRetry={() => { setCampaignResult(null); }}
+      />
+
       <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title="Choose from Project" size="xl">
         <ProjectMediaModal
           onSelect={(selectedFiles: File[]) => {
@@ -553,36 +670,18 @@ const CampaignForm: React.FC = () => {
       <Paper shadow="sm" p="xl" mb="xl" pos="relative">
         <LoadingOverlay visible={isSubmitting} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
         <Stepper active={activeStep} onStepClick={handleStepClick}>
-          <Stepper.Step label="Details" description="Content" />
           <Stepper.Step label="Platforms" description="Channels" />
+          <Stepper.Step label="Details" description="Content" />
           <Stepper.Step label="Target" description="Audience" />
           <Stepper.Step label="Schedule" description="Finish" />
         </Stepper>
 
         <Box mt="xl">
-          {activeStep === 0 && (
+          {activeStep === 0 && <PlatformSelector selectedPlatforms={selectedPlatforms} onChange={setSelectedPlatforms} />}
+
+          {activeStep === 1 && (
             <Box>
-              {/* Target Audience Selection in Step 1 for AI Context */}
-              <Group justify="space-between" mb="md">
-                <Select
-                  label="Target Audience (for AI context)"
-                  placeholder="Select group to tailor content"
-                  data={groups}
-                  value={selectedGroupId}
-                  onChange={setSelectedGroupId}
-                  clearable
-                  w={300}
-                />
-                <MultiSelect
-                  label="Select Individual Customers"
-                  placeholder="Or select specific people"
-                  data={clientsList}
-                  value={selectedClientIds}
-                  onChange={setSelectedClientIds}
-                  searchable
-                  clearable
-                  w={300}
-                />
+              <Group justify="flex-end" mb="md">
                 <Button
                   variant="gradient"
                   gradient={{ from: 'indigo', to: 'cyan' }}
@@ -683,17 +782,62 @@ const CampaignForm: React.FC = () => {
             </Box>
           )}
 
-          {activeStep === 1 && <PlatformSelector selectedPlatforms={selectedPlatforms} onChange={setSelectedPlatforms} />}
 
           {activeStep === 2 && (
             <Box>
-              <Title order={4} mb="md">Review Targeting</Title>
-              <Text mb="sm">
-                Selected Group: <b>{groups.find(g => g.value === selectedGroupId)?.label || "None"}</b>
-              </Text>
-              <Text mb="md">
+              <Title order={4} mb="sm">Select Target Audience</Title>
+              <Text size="sm" c="dimmed" mb="xl">Choose who will receive this campaign. If both are empty, you will automatically be prompted for manual entry upon sending.</Text>
+
+              <Select
+                label="Audience Group"
+                placeholder="Select group to broadcast to"
+                data={groups}
+                value={selectedGroupId}
+                onChange={setSelectedGroupId}
+                clearable
+                w={{base: '100%', sm: 400}}
+                mb="sm"
+              />
+
+              {/* Group audience preview */}
+              {selectedGroupId && (
+                <Box mb="lg">
+                  {groupClients.length > 0 ? (
+                    <>
+                      <Group gap="xs" mb="xs">
+                        <Badge color="blue" variant="light" size="sm">{groupClients.length} contacts in group</Badge>
+                      </Group>
+                      <ScrollArea h={groupClients.length > 5 ? 180 : undefined} type="auto">
+                        <Stack gap={6}>
+                          {groupClients.map((c, i) => (
+                            <Group key={i} gap="xs" p={6} style={{ borderRadius: 6, background: '#f8f9fa' }}>
+                              <Avatar size="xs" radius="xl" color="blue">{c.name?.[0]?.toUpperCase() || '?'}</Avatar>
+                              <Box style={{ flex: 1, minWidth: 0 }}>
+                                <Text size="xs" fw={500} truncate>{c.name}</Text>
+                                {c.email ? <Text size="xs" c="dimmed" truncate>{c.email}</Text> : null}
+                                {c.phone ? <Text size="xs" c="dimmed">{c.phone}</Text> : null}
+                                {c.country ? <Text size="xs" c="dimmed">Country: {c.country}</Text> : null}
+                                {c.instagram ? <Text size="xs" c="dimmed">IG: {c.instagram}</Text> : null}
+                                {c.facebook ? <Text size="xs" c="dimmed">FB: {c.facebook}</Text> : null}
+                              </Box>
+                            </Group>
+                          ))}
+                        </Stack>
+                      </ScrollArea>
+                    </>
+                  ) : (
+                    <Text size="xs" c="dimmed">No contacts found in this group.</Text>
+                  )}
+                </Box>
+              )}
+
+              <Divider my="md" />
+
+              <Text mb="xl">
                 Individual Customers: <b>{selectedClientIds.length > 0 ? `${selectedClientIds.length} users selected` : "None"}</b>
               </Text>
+
+              <Title order={4} mb="md">Platform Context</Title>
               {renderFlow()}
             </Box>
           )}

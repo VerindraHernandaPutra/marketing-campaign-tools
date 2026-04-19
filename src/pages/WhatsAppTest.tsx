@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { TextInput, Button, Paper, Title, Text, Container, Code, Loader, Badge, Group } from '@mantine/core';
 import { whatsappService } from '../services/whatsappService';
+import { useUserRole } from '../auth/UserContext';
 
 export default function WhatsAppTest() {
+    const { currentOrgId } = useUserRole();
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
@@ -12,13 +14,18 @@ export default function WhatsAppTest() {
 
     const handleSend = async () => {
         if (!phone) return;
+        if (!currentOrgId) {
+            setLogs(['Error: No active organization selected.']);
+            return;
+        }
+
         setLoading(true);
         setStatus(null);
         setLogs([]);
 
         try {
             addLog(`Queuing message to ${phone}...`);
-            const data = await whatsappService.queueMessage(phone);
+            const data = await whatsappService.queueMessage(phone, currentOrgId);
             addLog(`Message Queued! ID: ${data.id}`);
             setStatus('scheduling');
 

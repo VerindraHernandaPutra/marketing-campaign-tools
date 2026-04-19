@@ -27,6 +27,7 @@ const CanvaEditor: React.FC = () => {
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [projectTitle, setProjectTitle] = useState('Loading...');
+  const [isTemplate, setIsTemplate] = useState<boolean | undefined>(undefined);
 
   const [dimensions, setDimensions] = useState({ width: 850, height: 500 });
   const [isResizeModalOpen, setIsResizeModalOpen] = useState(false);
@@ -149,6 +150,34 @@ const CanvaEditor: React.FC = () => {
     isLocked.current = false;
   }, [canvas]);
 
+  // --- Auto-fit Canvas on Initial Load ---
+  const [initialFitDone, setInitialFitDone] = useState(false);
+  useEffect(() => {
+    if (canvas && mainAreaRef.current && dimensions.width > 0 && !initialFitDone) {
+      setTimeout(() => {
+        if (!canvas || !mainAreaRef.current) return;
+        const containerWidth = mainAreaRef.current.clientWidth;
+        const containerHeight = mainAreaRef.current.clientHeight;
+        
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        
+        const scaleX = containerWidth / dimensions.width; 
+        const scaleY = containerHeight / dimensions.height;
+        // Limit to 100% scale max, but give it comfortable 85% breathing room
+        const newZoom = Math.min(scaleX, scaleY, 1) * 0.85; 
+    
+        const panX = (containerWidth - dimensions.width * newZoom) / 2;
+        const panY = (containerHeight - dimensions.height * newZoom) / 2;
+    
+        canvas.setZoom(newZoom);
+        canvas.setViewportTransform([newZoom, 0, 0, newZoom, panX, panY]);
+        canvas.renderAll();
+        
+        setInitialFitDone(true);
+      }, 50); // Small delay to let DOM layout settle
+    }
+  }, [canvas, dimensions.width, dimensions.height, initialFitDone]);
+
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -174,7 +203,7 @@ const CanvaEditor: React.FC = () => {
     const fetchProject = async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('title, canvas_data')
+        .select('title, canvas_data, is_template')
         .eq('id', projectId)
         .single();
 
@@ -183,6 +212,7 @@ const CanvaEditor: React.FC = () => {
         notify.error('Load Failed', 'Could not load project data.');
       } else if (data) {
         setProjectTitle(data.title);
+        setIsTemplate(data.is_template);
         if (data.canvas_data) {
           const loadedData = data.canvas_data as LoadedCanvasData;
           if (loadedData.width && loadedData.height) {
@@ -279,9 +309,10 @@ const CanvaEditor: React.FC = () => {
     
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     
-    const scaleX = (containerWidth - 80) / dimensions.width; 
-    const scaleY = (containerHeight - 80) / dimensions.height;
-    const newZoom = Math.min(scaleX, scaleY, 1); 
+    const scaleX = containerWidth / dimensions.width; 
+    const scaleY = containerHeight / dimensions.height;
+    // Limit to 100% scale max, but give it comfortable 85% breathing room
+    const newZoom = Math.min(scaleX, scaleY, 1) * 0.85; 
 
     const panX = (containerWidth - dimensions.width * newZoom) / 2;
     const panY = (containerHeight - dimensions.height * newZoom) / 2;
@@ -308,6 +339,7 @@ const CanvaEditor: React.FC = () => {
         <AppShell.Header zIndex={200}>
           <Header 
             projectTitle={projectTitle}
+            isTemplate={isTemplate}
             onUpdateTitle={handleUpdateTitle}
             onSave={handleSaveProject} 
             sidebarOpened={sidebarOpened} 

@@ -15,17 +15,67 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Use Service Key to bypass RLS for writing
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
+function extractCampaignIdFromTags(tags) {
+    if (!Array.isArray(tags)) return null;
+
+    for (const tag of tags) {
+        if (!tag) continue;
+
+        if (typeof tag === 'string') {
+            const [name, value] = tag.split(':');
+            if (name === 'campaign_id' && value) return value;
+            continue;
+        }
+
+        if (typeof tag === 'object') {
+            if (tag.name === 'campaign_id' && tag.value) return String(tag.value);
+            if (tag.key === 'campaign_id' && tag.value) return String(tag.value);
+        }
+    }
+
+    return null;
+}
+
+function extractCampaignIdFromWebhookEvent(event) {
+    return (
+        event?.data?.campaign_id ||
+        event?.data?.metadata?.campaign_id ||
+        extractCampaignIdFromTags(event?.data?.tags) ||
+        extractCampaignIdFromTags(event?.tags) ||
+        null
+    );
+}
+
+function mapResendEventType(eventType) {
+    const normalized = String(eventType || '').replace('email.', '').toLowerCase();
+    if (normalized === 'click') return 'clicked';
+    if (normalized === 'open') return 'opened';
+    if (normalized === 'delivery') return 'delivered';
+    if (normalized === 'bounce') return 'bounced';
+    if (normalized === 'complaint') return 'bounced';
+    if (normalized === 'sent') return 'sent';
+    return normalized || 'unknown';
+}
+
 app.use(cors({ origin: '*', methods: ['POST', 'GET', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json({ limit: '10mb' }));
 
 // --- SEND EMAIL ENDPOINT ---
 app.post('/api/send-email', async (req, res) => {
     try {
-        const { to, subject, html, scheduledAt, attachments, tags } = req.body;
+        const { to, subject, html, scheduledAt, attachments, tags, campaignId, organizationId } = req.body;
         console.log(`Sending to: ${to}`);
         const resendApiKey = process.env.RESEND_API_KEY;
         
         if (!resendApiKey) return res.status(500).json({ error: 'Missing API Key' });
+
+        const mergedTags = Array.isArray(tags) ? [...tags] : [];
+        if (campaignId && !mergedTags.find((t) => t?.name === 'campaign_id')) {
+            mergedTags.push({ name: 'campaign_id', value: String(campaignId) });
+        }
+        if (organizationId && !mergedTags.find((t) => t?.name === 'organization_id')) {
+            mergedTags.push({ name: 'organization_id', value: String(organizationId) });
+        }
 
         const payload = {
             from: 'Marketing Team <info@marketing.gloaicloud.com>',
@@ -33,7 +83,7 @@ app.post('/api/send-email', async (req, res) => {
             subject: subject,
             html: html,
             reply_to: 'marketing@gloaicloud.com',
-            tags: tags || [], // Pass tags from frontend to track campaign_id
+            tags: mergedTags,
             headers: {
                 'X-Entity-Ref-ID': Date.now().toString(),
             }
@@ -61,10 +111,18 @@ app.post('/api/send-email', async (req, res) => {
         if (response.ok && supabase) {
             await supabase.from('email_events').insert({
                 email_id: data.id,
-                type: 'sent',
+                type: scheduledAt ? 'scheduled' : 'sent',
                 recipient: to,
+                campaign_id: campaignId || null,
                 created_at: new Date().toISOString()
             });
+
+            if (campaignId) {
+                await supabase
+                    .from('marketing_campaigns')
+                    .update({ status: scheduledAt ? 'scheduled' : 'sent' })
+                    .eq('id', campaignId);
+            }
         }
 
         if (!response.ok) throw new Error(data.message || 'Failed to send');
@@ -110,10 +168,14 @@ app.post('/api/webhooks/resend', async (req, res) => {
 
     if (supabase) {
         try {
+            const mappedType = mapResendEventType(event.type);
+            const campaignId = extractCampaignIdFromWebhookEvent(event);
+
             const insertData = {
                 email_id: event.data.email_id,
-                type: event.type.replace('email.', ''), // 'clicked', 'opened'
+                type: mappedType,
                 recipient: event.data.to ? event.data.to[0] : 'unknown',
+                campaign_id: campaignId,
                 created_at: event.created_at || new Date().toISOString()
             };
 
@@ -124,6 +186,27 @@ app.post('/api/webhooks/resend', async (req, res) => {
 
             const { error } = await supabase.from('email_events').insert(insertData);
             if (error) console.error("Supabase Insert Error:", error);
+
+            // Event-driven campaign status transition (source of truth from provider).
+            if (campaignId) {
+                let nextStatus = null;
+                if (['sent', 'delivered', 'opened', 'clicked'].includes(mappedType)) {
+                    nextStatus = 'sent';
+                } else if (mappedType === 'bounced') {
+                    nextStatus = 'failed';
+                }
+
+                if (nextStatus) {
+                    const { error: updateError } = await supabase
+                        .from('marketing_campaigns')
+                        .update({ status: nextStatus })
+                        .eq('id', campaignId);
+
+                    if (updateError) {
+                        console.error('Campaign status update error:', updateError);
+                    }
+                }
+            }
             
         } catch (err) {
             console.error("Webhook Processing Error:", err);
