@@ -76,14 +76,12 @@ const CampaignHistory: React.FC = () => {
     let query = supabase
       .from('marketing_campaigns')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (currentOrgId) {
       query = supabase
         .from('marketing_campaigns')
         .select('*')
-        .eq('user_id', user.id)
         .eq('organization_id', currentOrgId)
         .order('created_at', { ascending: false });
     }

@@ -67,24 +67,23 @@ const Projects: React.FC = () => {
   const isOperator = isSuperAdmin || role === 'operator';
 
   const { data: projects = [], isLoading: loading, refetch: fetchProjects } = useQuery({
-    queryKey: ['projects', user?.id],
+    queryKey: ['projects', currentOrgId],
     queryFn: async () => {
-        if (!user) return [];
+        if (!currentOrgId) return [];
         const { data, error } = await supabase
             .from('projects')
             .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-            .eq('user_id', user.id)
+            .eq('organization_id', currentOrgId)
             .order('updated_at', { ascending: false });
-            
+
         if (error) throw error;
-        // Reconstruct canvas_data for the frontend type
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (data || []).map((d: any) => ({
             ...d,
             canvas_data: { width: d.width, height: d.height }
         })) as Project[];
     },
-    enabled: !!user,
+    enabled: !!currentOrgId,
   });
 
   // --- Reset Pagination on Filter Change ---

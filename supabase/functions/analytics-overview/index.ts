@@ -20,7 +20,15 @@ type SocialInsightTotals = {
 
 function getStartDate(timeRange: string | undefined): Date {
   const now = new Date();
-  const days = timeRange === "30d" ? 30 : 7;
+  const map: Record<string, number> = {
+    "1d":   1,
+    "7d":   7,
+    "30d":  30,
+    "90d":  90,
+    "180d": 180,
+    "365d": 365,
+  };
+  const days = map[timeRange || "7d"] ?? 7;
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
 

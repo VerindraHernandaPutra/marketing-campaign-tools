@@ -62,13 +62,15 @@ const DashboardContent: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [templates, setTemplates] = useState<Project[]>([]);
-  const [campaignDesigns, setCampaignDesigns] = useState<Project[]>([]); 
-  
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
-  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // Derived slices — no extra fetches needed
+  const projects = allProjects;
+  const templates = allProjects.filter(p => p.is_template === true);
+  const campaignDesigns = allProjects.filter(p => p.is_template === false);
+  const loadingTemplates = loadingProjects;
+  const loadingCampaigns = loadingProjects;
   
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false); 
@@ -144,80 +146,28 @@ const DashboardContent: React.FC = () => {
 
   // --- Fetch Functions ---
 
-  const fetchRecentProjects = useCallback(async () => {
-      if (!user) return;
+  const fetchAllProjects = useCallback(async () => {
+      if (!currentOrgId) return;
       setLoadingProjects(true);
-      
-      const query = supabase
+
+      const { data, error } = await supabase
         .from('projects')
         .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .limit(100); 
-
-      const { data, error } = await query;
+        .eq('organization_id', currentOrgId)
+        .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching recent projects:', error);
+        console.error('Error fetching projects:', error);
       } else if (data) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
-        setProjects(mapped);
+        setAllProjects((data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[]);
       }
       setLoadingProjects(false);
-  }, [user]);
-
-  const fetchTemplates = useCallback(async () => {
-      if (!currentOrgId) return;
-      setLoadingTemplates(true);
-      
-      const query = supabase
-        .from('projects')
-        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-        .eq('organization_id', currentOrgId)
-        .eq('is_template', true)
-        .order('updated_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching templates:', error);
-      } else if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
-        setTemplates(mapped);
-      }
-      setLoadingTemplates(false);
   }, [currentOrgId]);
 
-  const fetchCampaignDesigns = useCallback(async () => {
-      if (!currentOrgId) return;
-      setLoadingCampaigns(true);
-      
-      const query = supabase
-        .from('projects')
-        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-        .eq('organization_id', currentOrgId)
-        .eq('is_template', false) 
-        .order('updated_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching campaign designs:', error);
-      } else if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
-        setCampaignDesigns(mapped);
-      }
-      setLoadingCampaigns(false);
-  }, [currentOrgId]); 
-
   useEffect(() => {
-    if (activeTab === 'recent') fetchRecentProjects();
-    if (activeTab === 'templates') fetchTemplates();
-    if (activeTab === 'campaigns') fetchCampaignDesigns();
-  }, [activeTab, fetchRecentProjects, fetchTemplates, fetchCampaignDesigns]);
+    fetchAllProjects();
+  }, [fetchAllProjects]);
 
   // --- Creation Logic ---
   const handleCreateProject = async (
@@ -298,9 +248,7 @@ const DashboardContent: React.FC = () => {
       const { error } = await supabase.from('projects').delete().eq('id', projectToDelete);
 
       if (!error) {
-          fetchTemplates();
-          fetchRecentProjects();
-          fetchCampaignDesigns();
+          fetchAllProjects();
           setDeleteModalOpen(false);
           setProjectToDelete(null);
       } else {
@@ -716,18 +664,18 @@ const DashboardContent: React.FC = () => {
                 <Group>
                     <ViewToggle />
                     {activeTab === 'recent' && (
-                        <Button variant="subtle" size="sm" onClick={fetchRecentProjects} color="blue">Refresh</Button>
+                        <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
                     )}
                     {activeTab === 'templates' && (
                         <>
                             {canCreateTemplates && <Button leftSection={<PlusIcon size={16} />} onClick={() => setIsTemplateModalOpen(true)}>New Template</Button>}
-                            <Button variant="subtle" size="sm" onClick={fetchTemplates} color="blue">Refresh</Button>
+                            <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
                         </>
                     )}
                     {activeTab === 'campaigns' && (
                         <>
                             <Button leftSection={<PlusIcon size={16} />} onClick={() => setIsDesignModalOpen(true)}>New Design</Button>
-                            <Button variant="subtle" size="sm" onClick={fetchCampaignDesigns} color="blue">Refresh</Button>
+                            <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
                         </>
                     )}
                 </Group>
@@ -751,16 +699,16 @@ const DashboardContent: React.FC = () => {
           </Box>
 
           <Tabs.Panel value="recent">
-            {loadingProjects ? <Center h={100}><Loader /></Center> : <DataRenderer data={projects} tagFilter={recentFilter} tagList={RECENT_TAGS} refreshFn={fetchRecentProjects} isTemplate={false} />}
+            {loadingProjects ? <Center h={100}><Loader /></Center> : <DataRenderer data={projects} tagFilter={recentFilter} tagList={RECENT_TAGS} refreshFn={fetchAllProjects} isTemplate={false} />}
           </Tabs.Panel>
-          
+
           <Tabs.Panel value="templates">
-            {loadingTemplates ? <Center h={100}><Loader /></Center> : <DataRenderer data={templates} tagFilter={templateFilter} tagList={TEMPLATE_TAGS} refreshFn={fetchTemplates} isTemplate={true} />}
+            {loadingTemplates ? <Center h={100}><Loader /></Center> : <DataRenderer data={templates} tagFilter={templateFilter} tagList={TEMPLATE_TAGS} refreshFn={fetchAllProjects} isTemplate={true} />}
           </Tabs.Panel>
 
           {isOperator && (
             <Tabs.Panel value="campaigns">
-               {loadingCampaigns ? <Center h={100}><Loader /></Center> : <DataRenderer data={campaignDesigns} tagFilter={campaignFilter} tagList={TEMPLATE_TAGS} refreshFn={fetchCampaignDesigns} isTemplate={false} />}
+               {loadingCampaigns ? <Center h={100}><Loader /></Center> : <DataRenderer data={campaignDesigns} tagFilter={campaignFilter} tagList={TEMPLATE_TAGS} refreshFn={fetchAllProjects} isTemplate={false} />}
             </Tabs.Panel>
           )}
         </Tabs>

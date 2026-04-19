@@ -55,10 +55,7 @@ export function AppRouter() {
           <Route element={<RoleGuard allowedRoles={['operator']} />}>
             <Route path="/groups" element={<Groups />} />
             <Route path="/clients" element={<Clients />} />
-            {/* Operator managing their own org users */}
             <Route path="/organization/users" element={<OrganizationDetails />} />
-            {/* Operator can see the specific Campaigns Design Page */}
-            <Route path="/campaigns" element={<Campaigns />} />
           </Route>
 
           {/* DESIGNER & OPERATOR */}
@@ -80,7 +77,10 @@ export function AppRouter() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/wa-test" element={<WhatsAppTest />} />
             <Route path="/wa-templates" element={<WhatsAppTemplates />} />
-            {/* Marketers can also view campaign designs */}
+          </Route>
+
+          {/* DESIGNER, MARKETER & OPERATOR — Campaign Designs overview */}
+          <Route element={<RoleGuard allowedRoles={['designer', 'marketer', 'operator']} />}>
             <Route path="/campaigns" element={<Campaigns />} />
           </Route>
 
