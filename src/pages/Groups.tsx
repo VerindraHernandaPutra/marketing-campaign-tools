@@ -1,8 +1,9 @@
 // [cite: src/pages/Groups.tsx]
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Container, Title, Button, Table, Group, TextInput, Modal, ActionIcon, 
-  LoadingOverlay, Paper, Drawer, Text, Select, Pagination, Stack, 
+  Button, Table, Group, TextInput, Modal, ActionIcon,
+  LoadingOverlay, Paper, Drawer, Text, Select, Pagination, Stack,
   Checkbox, ScrollArea, Avatar, Badge, Divider, Center, ThemeIcon, Box
 } from '@mantine/core';
 import { 
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import { useAuth } from '../auth/useAuth';
 
 interface MarketingGroup {
@@ -39,8 +41,6 @@ interface GroupWithCount {
 
 const Groups: React.FC = () => {
   const { user } = useAuth();
-  const [groups, setGroups] = useState<MarketingGroup[]>([]);
-  const [loading, setLoading] = useState(false);
 
   // -- Advanced Table States --
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,37 +69,31 @@ const Groups: React.FC = () => {
   const [rightSearch, setRightSearch] = useState('');
   const [isSavingMembers, setIsSavingMembers] = useState(false);
 
-  // Reset pagination
-  useEffect(() => {
-    setActivePage(1);
-  }, [searchQuery, sortBy, itemsPerPage]);
-
-  const fetchGroups = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('groups')
-      .select('*, client_groups(count)')
-      .eq('user_id', user.id);
-
-    if (error) console.error(error);
-    else {
+  const { data: groups = [], isLoading: loading, refetch: fetchGroups } = useQuery({
+    queryKey: ['groups', user?.id],
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*, client_groups(count)')
+        .eq('user_id', user!.id);
+      if (error) throw error;
       const rawData = data as unknown as GroupWithCount[];
-      const formatted = rawData.map((g) => ({
+      return rawData.map((g) => ({
         id: g.id,
         name: g.name,
         description: g.description,
         created_at: g.created_at,
-        client_count: g.client_groups?.[0]?.count || 0
-      }));
-      setGroups(formatted);
-    }
-    setLoading(false);
-  }, [user]);
+        client_count: g.client_groups?.[0]?.count || 0,
+      })) as MarketingGroup[];
+    },
+  });
 
+  // Reset pagination
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    setActivePage(1);
+  }, [searchQuery, sortBy, itemsPerPage]);
 
   // --- Data Processing ---
   const processedGroups = useMemo(() => {
@@ -134,7 +128,6 @@ const Groups: React.FC = () => {
   // --- Actions ---
   const handleSaveGroup = async () => {
     if (!user || !groupName) return;
-    setLoading(true);
     try {
       if (editingGroup) {
         await supabase.from('groups').update({ name: groupName, description: groupDesc }).eq('id', editingGroup.id);
@@ -146,8 +139,6 @@ const Groups: React.FC = () => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       alert(message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -304,18 +295,19 @@ const Groups: React.FC = () => {
 
   return (
     <PageShell>
-      <Container size="xl" p={0}>
-         <Group justify="space-between" mb="lg">
-          <div>
-              <Title order={3}>Client Groups</Title>
-              <Text c="dimmed" size="sm">Segment your audience</Text>
-          </div>
-          <Button size="xs" leftSection={<PlusIcon size={13} />} onClick={() => {
-            setEditingGroup(null); setGroupName(''); setGroupDesc(''); setModalOpen(true);
-          }}>
-            Create Group
-          </Button>
-        </Group>
+        <PageHeader
+          icon={<UsersIcon size={22} />}
+          title="Client Groups"
+          subtitle="Segment your audience into targeted lists"
+          gradient={{ from: 'violet', to: 'grape' }}
+          action={
+            <Button leftSection={<PlusIcon size={16} />} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} onClick={() => {
+              setEditingGroup(null); setGroupName(''); setGroupDesc(''); setModalOpen(true);
+            }}>
+              Create Group
+            </Button>
+          }
+        />
 
           <Paper shadow="sm" p="md" withBorder>
             <LoadingOverlay visible={loading} />
@@ -405,7 +397,6 @@ const Groups: React.FC = () => {
                 </Group>
             )}
           </Paper>
-      </Container>
 
       {/* Create/Edit Modal */}
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingGroup ? "Edit Group" : "Create Group"}>

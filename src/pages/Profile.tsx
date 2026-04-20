@@ -1,21 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MantineProvider, Flex, Container, Title, Paper, TextInput, Button, 
-  Avatar, Group, Text, LoadingOverlay, Box 
+import {
+  Flex, Container, Title, Paper, TextInput, Button,
+  Avatar, Group, Text, LoadingOverlay, Box
 } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
 import { UserIcon, SaveIcon } from 'lucide-react';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/useAuth';
-import '@mantine/core/styles.css';
-
 const Profile: React.FC = () => {
   const { user } = useAuth();
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
 
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
@@ -69,9 +63,8 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
+    <div className="w-full min-h-screen bg-white dark:bg-gray-900">
+      <DashboardHeader />
         <Flex>
           <DashboardSidebar />
           <Box className="flex-1 p-8">
@@ -120,8 +113,7 @@ const Profile: React.FC = () => {
             </Container>
           </Box>
         </Flex>
-      </div>
-    </MantineProvider>
+    </div>
   );
 };
 

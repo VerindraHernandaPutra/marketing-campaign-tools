@@ -6,7 +6,7 @@ import {
   HomeIcon, LayoutIcon, ImageIcon, SendIcon, BarChartIcon,
   UsersIcon, LayersIcon, ShieldIcon, MegaphoneIcon,
   MessageCircleIcon, InstagramIcon, MessagesSquareIcon, MessageSquareIcon,
-  BuildingIcon, PaletteIcon, RadioTowerIcon, MailIcon, CalendarIcon
+  BuildingIcon, PaletteIcon, RadioTowerIcon, MailIcon
 } from 'lucide-react';
 import { useUserRole } from '../../auth/UserContext';
 import { useAuth } from '../../auth/useAuth';
@@ -265,7 +265,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             <>
               <NavItem label="Inbox" icon={<MessageCircleIcon size={14} />} active={isActive('/inbox', true)} onClick={() => navigate('/inbox')} collapsed={collapsed} />
               <NavItem label="Broadcast" icon={<SendIcon size={14} />} active={isActive('/campaign-manager')} onClick={() => navigate('/campaign-manager')} collapsed={collapsed} />
-              <NavItem label="Campaign Calendar" icon={<CalendarIcon size={14} />} active={isActive('/scheduled', true)} onClick={() => navigate('/scheduled')} collapsed={collapsed} />
               <NavItem label="WA Templates" icon={<MessageSquareIcon size={14} />} active={isActive('/wa-templates', true)} onClick={() => navigate('/wa-templates')} collapsed={collapsed} />
               <NavItem label="Insight" icon={<BarChartIcon size={14} />} active={isActive('/analytics', true)} onClick={() => navigate('/analytics')} collapsed={collapsed} />
             </>

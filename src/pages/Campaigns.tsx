@@ -1,14 +1,15 @@
 //
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
 import {
-  MantineProvider, Flex, Container, Title, Box, TextInput,
+  Box, TextInput,
   SimpleGrid, Button, Group, Loader, Text, Center, ScrollArea, Chip,
   SegmentedControl, Tooltip, Modal, Stack, Paper, Table, Avatar, Badge, ActionIcon,
   Pagination, Select, ThemeIcon
 } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import DesignCard from '../components/Dashboard/DesignCard';
 import CreateNewCard from '../components/Dashboard/CreateNewCard';
 import ConfirmationModal from '../components/Layout/ConfirmationModal';
@@ -21,8 +22,6 @@ import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
 import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
-import '@mantine/core/styles.css';
-
 // Reuse Project Type
 interface Project {
   id: string;
@@ -43,10 +42,6 @@ const Campaigns: React.FC = () => {
   const { role, currentOrgId, isSuperAdmin } = useUserRole();
   const navigate = useNavigate();
 
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
-
   // View & Sort States
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,9 +51,6 @@ const Campaigns: React.FC = () => {
   // Pagination States
   const [activePage, setActivePage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<string>('12');
-
-  const [campaigns, setCampaigns] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modal States
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
@@ -76,36 +68,22 @@ const Campaigns: React.FC = () => {
     setActivePage(1);
   }, [searchQuery, sortBy, selectedTag, itemsPerPage]);
 
-  const fetchCampaigns = useCallback(async () => {
-    if (!currentOrgId) return;
-    setLoading(true);
-
-    // Fetch projects that are NOT templates (is_template = false)
-    const query = supabase
-      .from('projects')
-      .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-      .eq('organization_id', currentOrgId)
-      .eq('is_template', false)
-      .order('updated_at', { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching campaign designs:', error);
-    } else {
+  const { data: campaigns = [], isLoading: loading, refetch: fetchCampaigns } = useQuery({
+    queryKey: ['campaign-designs', currentOrgId],
+    enabled: !!currentOrgId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
+        .eq('organization_id', currentOrgId!)
+        .eq('is_template', false)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped = (data || []).map((d: any) => ({
-        ...d,
-        canvas_data: { width: d.width, height: d.height }
-      })) as Project[];
-      setCampaigns(mapped);
-    }
-    setLoading(false);
-  }, [currentOrgId]);
-
-  useEffect(() => {
-    fetchCampaigns();
-  }, [fetchCampaigns]);
+      return (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
+    },
+  });
 
   // --- Process Data ---
   const processData = () => {
@@ -317,56 +295,33 @@ const Campaigns: React.FC = () => {
     </SimpleGrid>
   );
 
-  const [collapsed, setCollapsed] = useState(false);
-
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
-        <DashboardSidebar collapsed={collapsed} />
-
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <DashboardHeader
-            colorScheme={colorScheme}
-            toggleColorScheme={toggleColorScheme}
-            onToggleSidebar={() => setCollapsed(c => !c)}
-          />
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
-            <ConfirmationModal
-              opened={deleteModalOpen}
-              onClose={() => setDeleteModalOpen(false)}
-              onConfirm={handleConfirmDelete}
-              title="Delete Design?"
-              message="Are you sure you want to delete this design? This action cannot be undone."
-              confirmLabel="Delete Forever"
-              isDanger
-            />
-
-            <Container size="xl">
-              <Group justify="space-between" mb="md">
-                <div>
-                  <Group gap="xs">
-                    <Title order={2}>Campaign Designs</Title>
-                    <Badge variant="light" color="purple" size="lg" circle>{campaigns.length}</Badge>
-                  </Group>
-                  <Text c="dimmed">
-                    Manage visual assets for your marketing campaigns
-                  </Text>
-                </div>
-
-                <Group>
-                  <ViewToggle />
-                  {canManageCampaigns && (
-                    <Button
-                      leftSection={<PlusIcon size={16} />}
-                      onClick={() => setIsDesignModalOpen(true)}
-                      color="blue"
-                    >
-                      New Design
-                    </Button>
-                  )}
-                </Group>
-              </Group>
+    <PageShell>
+      <ConfirmationModal
+        opened={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Design?"
+        message="Are you sure you want to delete this design? This action cannot be undone."
+        confirmLabel="Delete Forever"
+        isDanger
+      />
+      <PageHeader
+        icon={<LayoutTemplateIcon size={22} />}
+        title="Campaign Designs"
+        subtitle="Manage visual assets for your marketing campaigns"
+        gradient={{ from: 'pink', to: 'violet' }}
+        action={
+          <Group>
+            <ViewToggle />
+            {canManageCampaigns && (
+              <Button leftSection={<PlusIcon size={16} />} variant="gradient" gradient={{ from: 'pink', to: 'violet' }} onClick={() => setIsDesignModalOpen(true)}>
+                New Design
+              </Button>
+            )}
+          </Group>
+        }
+      />
 
               <Box my="md">
                 <Group justify="space-between" mb="md">
@@ -526,11 +481,7 @@ const Campaigns: React.FC = () => {
                   )}
                 </>
               )}
-            </Container>
-          </div>
-        </div>
-
-        {/* Create Campaign Design Modal */}
+      {/* Create Campaign Design Modal */}
         <Modal opened={isDesignModalOpen} onClose={() => setIsDesignModalOpen(false)} title="Create New Campaign Design" size="xl">
           <Box mb="lg">
             <Text c="dimmed" size="sm">Select a size to start designing.</Text>
@@ -607,8 +558,7 @@ const Campaigns: React.FC = () => {
           </Stack>
         </Modal>
 
-      </div>
-    </MantineProvider>
+    </PageShell>
   );
 };
 

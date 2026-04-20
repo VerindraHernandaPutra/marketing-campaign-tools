@@ -1,86 +1,68 @@
-import React, { useState } from 'react';
-import { MantineProvider, Flex, Container, Title, Box, Tabs, Group, Text, ThemeIcon, Button } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
+import React, { useState, lazy, Suspense } from 'react';
+import { Box, Tabs, Center, Loader } from '@mantine/core';
 import { CalendarDaysIcon, ListIcon, PlusIcon, RocketIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@mantine/core';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
-import ScheduledCalendar from '../components/ScheduledPosts/ScheduledCalendar';
+import PageHeader from '../components/Dashboard/PageHeader';
 import ScheduledList from '../components/ScheduledPosts/ScheduledList';
-import '@mantine/core/styles.css';
+
+const ScheduledCalendar = lazy(() => import('../components/ScheduledPosts/ScheduledCalendar'));
 
 const ScheduledPosts: React.FC = () => {
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const [activeTab, setActiveTab] = useState<string | null>('history');
+  const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
 
-  const toggleColorScheme = (value?: 'light' | 'dark') =>
-    setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
-
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
-        <Flex>
-          <DashboardSidebar />
-          <Box className="flex-1 p-8">
-            <Container size="xl">
+    <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
+      <DashboardSidebar collapsed={collapsed} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <DashboardHeader onToggleSidebar={() => setCollapsed(c => !c)} />
+        <Box style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
 
-              {/* Page Header */}
-              <Group justify="space-between" mb="xl" align="flex-start">
-                <Group gap="md">
-                  <ThemeIcon size="xl" radius="md" variant="gradient" gradient={{ from: 'indigo', to: 'cyan' }}>
-                    <RocketIcon size={22} />
-                  </ThemeIcon>
-                  <Box>
-                    <Title order={2} lh={1}>Campaign Calendar</Title>
-                    <Text size="sm" c="dimmed" mt={2}>
-                      Track, review and manage all your past and upcoming campaigns
-                    </Text>
-                  </Box>
-                </Group>
-                <Button
-                  leftSection={<PlusIcon size={16} />}
-                  variant="gradient"
-                  gradient={{ from: 'indigo', to: 'cyan' }}
-                  onClick={() => navigate('/campaign-manager/new')}
-                >
-                  New Campaign
-                </Button>
-              </Group>
+          <PageHeader
+            icon={<RocketIcon size={22} />}
+            title="Campaigns"
+            subtitle="Track, review and manage all your past and upcoming campaigns"
+            gradient={{ from: 'indigo', to: 'cyan' }}
+            action={
+              <Button
+                leftSection={<PlusIcon size={16} />}
+                variant="gradient"
+                gradient={{ from: 'indigo', to: 'cyan' }}
+                onClick={() => navigate('/campaign-manager/new')}
+              >
+                New Campaign
+              </Button>
+            }
+          />
 
-              {/* Tabs */}
-              <Tabs value={activeTab} onChange={setActiveTab} variant="pills" radius="md">
-                <Tabs.List mb="xl">
-                  <Tabs.Tab
-                    value="history"
-                    leftSection={<ListIcon size={15} />}
-                  >
-                    History & All Campaigns
-                  </Tabs.Tab>
-                  <Tabs.Tab
-                    value="calendar"
-                    leftSection={<CalendarDaysIcon size={15} />}
-                  >
-                    Calendar View
-                  </Tabs.Tab>
-                </Tabs.List>
+          <Tabs value={activeTab} onChange={setActiveTab} variant="pills" radius="md">
+            <Tabs.List mb="xl">
+              <Tabs.Tab value="history" leftSection={<ListIcon size={15} />}>
+                History & All Campaigns
+              </Tabs.Tab>
+              <Tabs.Tab value="calendar" leftSection={<CalendarDaysIcon size={15} />}>
+                Calendar View
+              </Tabs.Tab>
+            </Tabs.List>
 
-                <Tabs.Panel value="history">
-                  <ScheduledList />
-                </Tabs.Panel>
+            <Tabs.Panel value="history">
+              <ScheduledList />
+            </Tabs.Panel>
 
-                <Tabs.Panel value="calendar">
-                  <ScheduledCalendar />
-                </Tabs.Panel>
-              </Tabs>
+            <Tabs.Panel value="calendar">
+              <Suspense fallback={<Center h={300}><Loader size="sm" color="blue" /></Center>}>
+                {activeTab === 'calendar' && <ScheduledCalendar />}
+              </Suspense>
+            </Tabs.Panel>
+          </Tabs>
 
-            </Container>
-          </Box>
-        </Flex>
+        </Box>
       </div>
-    </MantineProvider>
+    </div>
   );
 };
 

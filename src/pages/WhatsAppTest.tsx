@@ -42,9 +42,10 @@ export default function WhatsAppTest() {
                 }
             });
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            addLog(`Error: ${error.message}`);
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            addLog(`Error: ${message}`);
             setLoading(false);
         }
     };

@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import {
   SendIcon, SearchIcon, MessageCircleIcon,
-  InstagramIcon, FacebookIcon, PaperclipIcon, UserIcon, ArrowLeftIcon, PhoneIcon
+  InstagramIcon, FacebookIcon, PaperclipIcon, ArrowLeftIcon, PhoneIcon
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
@@ -235,8 +235,8 @@ export default function Inbox() {
       setInputText('');
       setFile(null);
       resetRef.current?.();
-    } catch (e: any) {
-      alert('Error sending: ' + e.message);
+    } catch (e: unknown) {
+      alert('Error sending: ' + (e instanceof Error ? e.message : 'Unknown error'));
     } finally {
       setIsSending(false);
     }
@@ -267,7 +267,7 @@ export default function Inbox() {
           <Box
             w={{ base: '100%', sm: 320 }}
             style={{ borderRight: '1px solid #e9ecef', display: 'flex', flexDirection: 'column' }}
-            display={{ base: activeConvo ? 'none' : 'flex', sm: 'flex' } as any}
+            display={{ base: activeConvo ? 'none' : 'flex', sm: 'flex' } as unknown}
           >
             <Box p="md" pb={0}>
               <Text fw={700} size="lg" mb="sm">Omnichannel Inbox</Text>
@@ -364,7 +364,7 @@ export default function Inbox() {
           {/* ─── RIGHT: Chat Thread ─── */}
           <Box
             style={{ flex: 1, flexDirection: 'column', backgroundColor: '#f9fafb', minWidth: 0 }}
-            display={{ base: activeConvo ? 'flex' : 'none', sm: 'flex' } as any}
+            display={{ base: activeConvo ? 'flex' : 'none', sm: 'flex' } as unknown}
           >
             {!activeConvo ? (
               <Flex direction="column" align="center" justify="center" h="100%" c="dimmed">

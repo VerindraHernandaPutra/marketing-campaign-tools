@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  MantineProvider, Flex, Container, Title, Box, TextInput,
+  Box, TextInput,
   SimpleGrid, Button, Group, Loader, Text, Center, ScrollArea, Chip,
   SegmentedControl, Tooltip, Modal, Stack, Paper, Table, Avatar, Badge, ActionIcon,
   Pagination, Select, ThemeIcon
 } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import DesignCard from '../components/Dashboard/DesignCard';
 import CreateNewCard from '../components/Dashboard/CreateNewCard';
 import ConfirmationModal from '../components/Layout/ConfirmationModal';
@@ -20,8 +20,6 @@ import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
 import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
-import '@mantine/core/styles.css';
-
 interface ProjectTemplate {
   id: string;
   title: string;
@@ -41,10 +39,6 @@ const Templates: React.FC = () => {
   const { role, currentOrgId, isSuperAdmin } = useUserRole();
   const navigate = useNavigate();
 
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
-
   // View & Sort States
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,9 +48,6 @@ const Templates: React.FC = () => {
   // Pagination States
   const [activePage, setActivePage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<string>('12');
-
-  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modal States
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -73,35 +64,22 @@ const Templates: React.FC = () => {
     setActivePage(1);
   }, [searchQuery, sortBy, selectedTag, itemsPerPage]);
 
-  const fetchTemplates = useCallback(async () => {
-    if (!currentOrgId) return;
-    setLoading(true);
-
-    const query = supabase
-      .from('projects')
-      .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-      .eq('is_template', true)
-      .eq('organization_id', currentOrgId)
-      .order('updated_at', { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching templates:', error);
-    } else {
+  const { data: templates = [], isLoading: loading, refetch: fetchTemplates } = useQuery({
+    queryKey: ['templates', currentOrgId],
+    enabled: !!currentOrgId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
+        .eq('is_template', true)
+        .eq('organization_id', currentOrgId!)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped = (data || []).map((d: any) => ({
-        ...d,
-        canvas_data: { width: d.width, height: d.height }
-      })) as ProjectTemplate[];
-      setTemplates(mapped);
-    }
-    setLoading(false);
-  }, [currentOrgId]);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
+      return (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as ProjectTemplate[];
+    },
+  });
 
   // --- Process Data ---
   const processData = () => {
@@ -268,22 +246,9 @@ const Templates: React.FC = () => {
     </SimpleGrid>
   );
 
-  const [collapsed, setCollapsed] = useState(false);
-
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
-        <DashboardSidebar collapsed={collapsed} />
-
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <DashboardHeader
-            colorScheme={colorScheme}
-            toggleColorScheme={toggleColorScheme}
-            onToggleSidebar={() => setCollapsed(c => !c)}
-          />
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
-            <ConfirmationModal
+    <PageShell>
+      <ConfirmationModal
               opened={deleteModalOpen}
               onClose={() => setDeleteModalOpen(false)}
               onConfirm={handleConfirmDelete}
@@ -293,33 +258,22 @@ const Templates: React.FC = () => {
               isDanger
             />
 
-            <Container size="xl">
-              <Group justify="space-between" mb="md">
-                <div>
-                  <Group gap="xs">
-                    <Title order={2}>Templates</Title>
-                    <Badge variant="light" color="blue" size="lg" circle>{templates.length}</Badge>
+              <PageHeader
+                icon={<LayoutTemplateIcon size={22} />}
+                title="Templates"
+                subtitle={canManageTemplates ? "Manage organization templates" : "Choose a template to start your design"}
+                gradient={{ from: 'teal', to: 'cyan' }}
+                action={
+                  <Group>
+                    <ViewToggle />
+                    {canManageTemplates && (
+                      <Button leftSection={<PlusIcon size={16} />} variant="gradient" gradient={{ from: 'teal', to: 'cyan' }} onClick={() => setIsTemplateModalOpen(true)}>
+                        New Template
+                      </Button>
+                    )}
                   </Group>
-                  <Text c="dimmed">
-                    {canManageTemplates
-                      ? "Manage organization templates"
-                      : "Choose a template to start your design"}
-                  </Text>
-                </div>
-
-                <Group>
-                  <ViewToggle />
-                  {canManageTemplates && (
-                    <Button
-                      leftSection={<PlusIcon size={16} />}
-                      onClick={() => setIsTemplateModalOpen(true)}
-                      color="blue"
-                    >
-                      New Template
-                    </Button>
-                  )}
-                </Group>
-              </Group>
+                }
+              />
 
               <Box my="md">
                 <Group justify="space-between" mb="md">
@@ -479,11 +433,7 @@ const Templates: React.FC = () => {
                   )}
                 </>
               )}
-            </Container>
-          </div>
-        </div>
-
-        {/* Create Template Modal */}
+      {/* Create Template Modal */}
         <Modal opened={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Create New Template" size="xl">
           <Box mb="lg">
             <Text c="dimmed" size="sm">Select a preset size to create a new master template.</Text>
@@ -573,8 +523,7 @@ const Templates: React.FC = () => {
           </Stack>
         </Modal>
 
-      </div>
-    </MantineProvider>
+    </PageShell>
   );
 };
 

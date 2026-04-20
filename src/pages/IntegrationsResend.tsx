@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Title, Card, Text, Button, Box, PasswordInput, TextInput,
-  Group, Stack, Alert, Badge, Divider, ThemeIcon
+  Card, Text, Button, PasswordInput, TextInput,
+  Group, Stack, Alert, Badge, Divider
 } from '@mantine/core';
 import { MailIcon, SaveIcon, InfoIcon, CheckCircleIcon, Trash2Icon, AlertCircleIcon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
@@ -73,8 +74,9 @@ const IntegrationsResend = () => {
 
       notify.success('Saved!', 'Resend configuration saved. Send a test email to verify your API key!');
       setIsConnected(true);
-    } catch (error: any) {
-      notify.error('Error', error.message || 'Failed to save configuration.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save configuration.';
+      notify.error('Error', message);
     } finally {
       setLoading(false);
     }
@@ -102,24 +104,13 @@ const IntegrationsResend = () => {
 
   return (
     <PageShell>
-      <Box maw={800} mx="auto">
-        {/* Header */}
-        <Box mb="xl">
-          <Group gap="xs" align="center" mb={4}>
-            <ThemeIcon color="dark" size="lg" radius="md">
-              <MailIcon size={18} />
-            </ThemeIcon>
-            <Title order={2}>Resend Email API</Title>
-            {isConnected && (
-              <Badge color="green" variant="light" leftSection={<CheckCircleIcon size={12} />}>
-                Connected
-              </Badge>
-            )}
-          </Group>
-          <Text c="dimmed" size="sm">
-            Connect your Resend account to send beautifully crafted marketing emails directly from your own domain.
-          </Text>
-        </Box>
+        <PageHeader
+          icon={<MailIcon size={22} />}
+          title="Resend Email API"
+          subtitle="Connect your Resend account to send beautifully crafted marketing emails directly from your own domain."
+          gradient={{ from: 'violet', to: 'indigo' }}
+          action={isConnected ? <Badge color="green" variant="light" size="lg" leftSection={<CheckCircleIcon size={12} />}>Connected</Badge> : undefined}
+        />
 
         {/* Setup Guide */}
         <Alert icon={<InfoIcon size={16} />} title="Setup Guide" color="blue" mb="lg">
@@ -205,7 +196,6 @@ const IntegrationsResend = () => {
             <code>onboarding@resend.dev</code> as your From address (Resend's shared test domain).
           </Alert>
         )}
-      </Box>
     </PageShell>
   );
 };

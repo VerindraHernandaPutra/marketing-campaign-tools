@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  MantineProvider, Flex, Container, Title, Box, Group, Button, TextInput, 
+import {
+  Box, Group, Button, TextInput,
   Select, SegmentedControl, SimpleGrid, Center, Loader, Text, Tooltip,
   Paper, Table, Avatar, Badge, ActionIcon, ScrollArea, Chip, Modal, Stack,
   Pagination, ThemeIcon
 } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
+import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import DesignCard from '../components/Dashboard/DesignCard';
 import CreateNewCard from '../components/Dashboard/CreateNewCard';
 import ConfirmationModal from '../components/Layout/ConfirmationModal';
@@ -17,7 +16,6 @@ import {
   TrashIcon, EditIcon, LayoutTemplateIcon, FileTextIcon,
   LayoutIcon, InstagramIcon, FacebookIcon, MailIcon, SortAscIcon, CheckIcon
 } from 'lucide-react';
-import '@mantine/core/styles.css';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/useAuth';
 import { useUserRole } from '../auth/UserContext';
@@ -43,10 +41,6 @@ const Projects: React.FC = () => {
   const { role, isSuperAdmin, currentOrgId } = useUserRole();
   const navigate = useNavigate();
   
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
-
   // View & Filter States
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,10 +253,7 @@ const Projects: React.FC = () => {
   );
 
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
-        
+    <PageShell>
         <ConfirmationModal
             opened={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
@@ -272,24 +263,20 @@ const Projects: React.FC = () => {
             confirmLabel="Delete Forever"
             isDanger
         />
-
-        <Flex>
-          <DashboardSidebar />
-          <Box className="flex-1 p-8">
-            <Container size="xl">
-              <Group justify="space-between" mb="md">
-                <Group gap="xs">
-                    <Title order={2}>All Projects</Title>
-                    <Badge variant="light" color="blue" size="lg" circle>{projects.length}</Badge>
-                </Group>
-                
-                <Group>
-                    <ViewToggle />
-                    <Button leftSection={<PlusIcon size={16} />} color="blue" onClick={() => setIsCreateModalOpen(true)}>
-                    New Project
-                    </Button>
-                </Group>
-              </Group>
+        <PageHeader
+          icon={<LayoutTemplateIcon size={22} />}
+          title="All Projects"
+          subtitle="Manage your design projects"
+          gradient={{ from: 'indigo', to: 'blue' }}
+          action={
+            <Group>
+              <ViewToggle />
+              <Button leftSection={<PlusIcon size={16} />} variant="gradient" gradient={{ from: 'indigo', to: 'blue' }} onClick={() => setIsCreateModalOpen(true)}>
+                New Project
+              </Button>
+            </Group>
+          }
+        />
 
               <Box my="md">
                  <Group justify="space-between" mb="md">
@@ -450,10 +437,6 @@ const Projects: React.FC = () => {
                   )}
                 </>
               )}
-            </Container>
-          </Box>
-        </Flex>
-
         {/* Create Project Modal (Size Selection) */}
         <Modal opened={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Project" size="xl">
             <Box mb="lg">
@@ -544,8 +527,7 @@ const Projects: React.FC = () => {
             </Stack>
         </Modal>
 
-      </div>
-    </MantineProvider>
+    </PageShell>
   );
 };
 

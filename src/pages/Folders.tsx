@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
 // 'ColorScheme' dihapus
-import { MantineProvider, Flex, Container, Title, Box, Group, Button, TextInput, Paper, Text, ActionIcon, Menu, Modal, SimpleGrid, Badge } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
+import { Flex, Container, Title, Box, Group, Button, TextInput, Paper, Text, ActionIcon, Menu, Modal, SimpleGrid, Badge } from '@mantine/core';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
 // 'PlusIcon' dihapus
 import { SearchIcon, FolderIcon, MoreVerticalIcon, EditIcon, TrashIcon, FolderPlusIcon } from 'lucide-react';
-import '@mantine/core/styles.css';
-
 const Folders: React.FC = () => {
-  const preferredColorScheme = useColorScheme();
-  // Tipe 'ColorScheme' diubah menjadi 'light' | 'dark'
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpened, setCreateModalOpened] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  // Tipe 'ColorScheme' diubah menjadi 'light' | 'dark'
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
   const folders = [{
     id: '1',
     name: 'Brand Assets',
@@ -60,10 +52,9 @@ const Folders: React.FC = () => {
     setCreateModalOpened(false);
   };
   
-  // 'theme', 'withGlobalStyles', dan 'withNormalizeCSS' diperbarui
-  return <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
+  return (
+    <div className="w-full min-h-screen bg-white dark:bg-gray-900">
+      <DashboardHeader />
         <Flex>
           <DashboardSidebar />
           <Box className="flex-1 p-8">
@@ -132,8 +123,8 @@ const Folders: React.FC = () => {
             <Button onClick={handleCreateFolder}>Create</Button>
           </Group>
         </Modal>
-      </div>
-    </MantineProvider>;
+    </div>
+  );
 };
 
 export default Folders;

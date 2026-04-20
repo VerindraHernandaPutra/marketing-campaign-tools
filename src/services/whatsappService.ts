@@ -38,7 +38,7 @@ export const whatsappService = {
     /**
      * Subscribe to changes for real-time updates in UI
      */
-    subscribeToMessage(messageId: number, onUpdate: (payload: any) => void) {
+    subscribeToMessage(messageId: number, onUpdate: (payload: unknown) => void) {
         return supabase
             .channel(`message-${messageId}`)
             .on(

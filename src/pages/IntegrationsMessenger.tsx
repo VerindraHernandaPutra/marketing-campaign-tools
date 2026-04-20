@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Title, Card, Text, Button, List, LoadingOverlay, Badge, Group, Box, Avatar, Modal, ThemeIcon, Paper, Flex,
   Alert, Divider, Stack
 } from '@mantine/core';
 import { MessagesSquareIcon, PlusIcon, TrashIcon, CheckCircle2Icon, ShieldCheckIcon, InfoIcon, CheckCircleIcon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import { supabase } from '../supabaseClient';
 import { useUserRole } from '../auth/UserContext';
 import { useMetaAuth } from '../hooks/useMetaAuth';
@@ -13,7 +14,7 @@ interface Integration {
   id: string;
   platform: string;
   provider_account_id: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 const IntegrationsMessenger = () => {
@@ -23,23 +24,24 @@ const IntegrationsMessenger = () => {
     const [loading, setLoading] = useState(false);
     const [connectModalOpen, setConnectModalOpen] = useState(false);
 
-    useEffect(() => {
-        if (currentOrgId) fetchIntegrations();
-    }, [currentOrgId]);
-
-    const fetchIntegrations = async () => {
+    const fetchIntegrations = useCallback(async () => {
+        if (!currentOrgId) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('organization_integrations')
             .select('*')
             .eq('organization_id', currentOrgId)
             .ilike('platform', 'facebook%');
-        
+
         if (!error && data) {
             setIntegrations(data as Integration[]);
         }
         setLoading(false);
-    };
+    }, [currentOrgId]);
+
+    useEffect(() => {
+        fetchIntegrations();
+    }, [fetchIntegrations]);
 
     const handleDisconnectAll = async () => {
         if (!window.confirm('Are you sure you want to disconnect all Facebook Pages?')) return;
@@ -55,23 +57,15 @@ const IntegrationsMessenger = () => {
 
     return (
         <PageShell>
-            <Box pos="relative" maw={800} mx="auto">
+            <Box pos="relative">
                 <LoadingOverlay visible={loading} />
-                
-                <Group gap="xs" align="center" mb={4}>
-                    <ThemeIcon color="blue" size="lg" radius="md">
-                        <MessagesSquareIcon size={18} />
-                    </ThemeIcon>
-                    <Title order={2}>Messenger (Facebook Pages)</Title>
-                    {integrations.length > 0 && (
-                        <Badge color="green" variant="light" leftSection={<CheckCircleIcon size={12} />}>
-                            Connected
-                        </Badge>
-                    )}
-                </Group>
-                <Text c="dimmed" size="sm" mb="xl">
-                    Connect Facebook Pages to handle Messenger DMs and manage page-side messaging workflows.
-                </Text>
+                <PageHeader
+                    icon={<MessagesSquareIcon size={22} />}
+                    title="Messenger (Facebook Pages)"
+                    subtitle="Connect Facebook Pages to handle Messenger DMs and manage page-side messaging workflows."
+                    gradient={{ from: 'blue', to: 'indigo' }}
+                    action={integrations.length > 0 ? <Badge color="green" variant="light" size="lg" leftSection={<CheckCircleIcon size={12} />}>Connected</Badge> : undefined}
+                />
 
                 <Alert icon={<InfoIcon size={16} />} title="Setup Guide" color="blue" mb="lg">
                     <Stack gap={4}>

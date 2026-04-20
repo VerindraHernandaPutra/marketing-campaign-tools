@@ -1,16 +1,18 @@
 // [cite: src/components/Dashboard/DashboardContent.tsx]
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    Container, Tabs, SimpleGrid, Title, Text, Box, Group, Button, 
-    Center, Loader, Badge, Modal, ScrollArea, Chip, ActionIcon, 
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+    Tabs, SimpleGrid, Text, Box, Group, Button,
+    Center, Loader, Badge, Modal, ScrollArea, Chip, ActionIcon,
     Table, SegmentedControl, Paper, Avatar, TagsInput, Tooltip, Stack,
     Pagination, Select, TextInput, ThemeIcon
 } from '@mantine/core';
-import { 
-    LayoutIcon, FacebookIcon, InstagramIcon, MailIcon, PlusIcon, 
+import {
+    LayoutIcon, FacebookIcon, InstagramIcon, MailIcon, PlusIcon,
     FilterIcon, GridIcon, ListIcon, TrashIcon, EditIcon, LayoutTemplateIcon,
     FileTextIcon, SearchIcon, CheckIcon, SortAscIcon
 } from 'lucide-react';
+import PageHeader from './PageHeader';
 import { Navigate, useNavigate } from 'react-router-dom';
 import CreateNewCard from './CreateNewCard';
 import DesignCard from './DesignCard';
@@ -62,8 +64,21 @@ const DashboardContent: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); 
   
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
+  const { data: allProjects = [], isLoading: loadingProjects, refetch: fetchAllProjects } = useQuery({
+    queryKey: ['projects', currentOrgId],
+    enabled: !!currentOrgId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
+        .eq('organization_id', currentOrgId!)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[];
+    },
+  });
 
   // Derived slices — no extra fetches needed
   const projects = allProjects;
@@ -146,28 +161,6 @@ const DashboardContent: React.FC = () => {
 
   // --- Fetch Functions ---
 
-  const fetchAllProjects = useCallback(async () => {
-      if (!currentOrgId) return;
-      setLoadingProjects(true);
-
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, user_id, title, thumbnail_url, created_at, updated_at, tags, is_template, organization_id, width:canvas_data->width, height:canvas_data->height')
-        .eq('organization_id', currentOrgId)
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching projects:', error);
-      } else if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setAllProjects((data || []).map((d: any) => ({ ...d, canvas_data: { width: d.width, height: d.height } })) as Project[]);
-      }
-      setLoadingProjects(false);
-  }, [currentOrgId]);
-
-  useEffect(() => {
-    fetchAllProjects();
-  }, [fetchAllProjects]);
 
   // --- Creation Logic ---
   const handleCreateProject = async (
@@ -493,29 +486,26 @@ const DashboardContent: React.FC = () => {
 
   if (isMarketer) {
     return (
-      <Box className="py-8">
-        <Container size="xl">
-          <Box mb="xl">
-            <Group align="center" mb="xs">
-                <Title order={2}>{getGreeting()}</Title>
-                <Badge color="cyan" variant="light">Marketer</Badge>
-            </Group>
-            <Text c="dimmed" size="sm">{getSubtitle()}</Text>
-          </Box>
-
-          <SimpleGrid cols={3} spacing="lg" mb="xl">
-             <MetricsCard title="Active Campaigns" value="4" change={12} trend="up" />
-             <MetricsCard title="Total Reach" value="12.5k" change={5.4} trend="up" />
-             <MetricsCard title="Engagement Rate" value="4.2%" change={-1.1} trend="down" />
-          </SimpleGrid>
-          <EngagementChart />
-        </Container>
-      </Box>
+      <>
+        <PageHeader
+          icon={<MailIcon size={22} />}
+          title={getGreeting()}
+          subtitle={getSubtitle()}
+          gradient={{ from: 'cyan', to: 'teal' }}
+          action={<Badge color="cyan" variant="light" size="lg">Marketer</Badge>}
+        />
+        <SimpleGrid cols={3} spacing="lg" mb="xl">
+           <MetricsCard title="Active Campaigns" value="4" change={12} trend="up" />
+           <MetricsCard title="Total Reach" value="12.5k" change={5.4} trend="up" />
+           <MetricsCard title="Engagement Rate" value="4.2%" change={-1.1} trend="down" />
+        </SimpleGrid>
+        <EngagementChart />
+      </>
     );
   }
 
   return (
-    <Box className="py-8">
+    <Box className="py-0">
       <ConfirmationModal
         opened={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
@@ -609,18 +599,19 @@ const DashboardContent: React.FC = () => {
         </Stack>
       </Modal>
 
-      <Container size="xl">
-        <Box mb="xl">
-          <Group align="center" mb="xs">
-            <Title order={2}>{getGreeting()}</Title>
-            {role === 'operator' && <Badge color="blue" variant="light">Operator</Badge>}
-            {role === 'designer' && <Badge color="pink" variant="light">Designer</Badge>}
-          </Group>
-          <Text c="dimmed" size="sm" mb="lg">{getSubtitle()}</Text>
-          <CreationOptions isTemplateMode={false} />
-        </Box>
-        
-        <Tabs value={activeTab} onChange={setActiveTab} className="mt-8" color="blue">
+      <PageHeader
+        icon={role === 'operator' ? <LayoutIcon size={22} /> : <LayoutTemplateIcon size={22} />}
+        title={getGreeting()}
+        subtitle={getSubtitle()}
+        gradient={role === 'operator' ? { from: 'blue', to: 'indigo' } : { from: 'pink', to: 'violet' }}
+        action={
+          role === 'operator' ? <Badge color="blue" variant="light" size="lg">Operator</Badge> :
+          role === 'designer' ? <Badge color="pink" variant="light" size="lg">Designer</Badge> : undefined
+        }
+      />
+      <CreationOptions isTemplateMode={false} />
+
+      <Tabs value={activeTab} onChange={setActiveTab} className="mt-8" color="blue">
           <Tabs.List>
             <Tabs.Tab value="recent">Recent designs</Tabs.Tab>
             <Tabs.Tab value="templates">Templates</Tabs.Tab>
@@ -712,7 +703,6 @@ const DashboardContent: React.FC = () => {
             </Tabs.Panel>
           )}
         </Tabs>
-      </Container>
 
       <Modal opened={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Create New Template" size="xl">
         <Box mb="lg">

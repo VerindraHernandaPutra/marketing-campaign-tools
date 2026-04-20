@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image, MultiSelect, Badge, Avatar, ScrollArea, Divider, Stack } from '@mantine/core';
+import { Paper, TextInput, Textarea, Button, Group, FileInput, Box, Text, Stepper, Modal, LoadingOverlay, Select, Title, SimpleGrid, ActionIcon, Image, Badge, Avatar, ScrollArea, Divider, Stack } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { UploadIcon, SendIcon, ClockIcon, SaveIcon, XIcon, SparklesIcon } from 'lucide-react';
@@ -40,8 +40,7 @@ const CampaignForm: React.FC = () => {
   const [groups, setGroups] = useState<{ value: string, label: string }[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   
-  const [clientsList, setClientsList] = useState<{ value: string, label: string }[]>([]);
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const selectedClientIds: string[] = [];
   const [groupClients, setGroupClients] = useState<{ name: string; email?: string; phone?: string; country?: string; instagram?: string; facebook?: string }[]>([]);
   const [localMediaPreviewUrls, setLocalMediaPreviewUrls] = useState<string[]>([]);
 
@@ -71,15 +70,11 @@ const CampaignForm: React.FC = () => {
   useEffect(() => {
     const fetchTargets = async () => {
       if (!user) return;
-      
       const { data: gData } = await supabase.from('groups').select('id, name').eq('user_id', user.id);
       if (gData) setGroups(gData.map(g => ({ value: g.id, label: g.name })));
-
-      const { data: cData } = await supabase.from('clients').select('id, name, email, phone').eq('user_id', user.id);
-      if (cData) setClientsList(cData.map(c => ({ value: c.id, label: `${c.name} ${c.email ? `(${c.email})` : ''}` })));
     };
     fetchTargets();
-  }, [currentOrgId]);
+  }, [currentOrgId, user]);
 
   // Fetch clients from selected group for audience preview
   useEffect(() => {
@@ -315,9 +310,11 @@ const CampaignForm: React.FC = () => {
   };
 
 
+  type ClientRecord = { phone?: string | null; email?: string | null; facebook_psid?: string | null };
+
   const getRecipientsForPlatform = async (groupId: string | null, platformType: 'phone' | 'email' | 'messenger'): Promise<string[]> => {
     let targets: string[] = [];
-    let combinedClients: any[] = [];
+    let combinedClients: ClientRecord[] = [];
     
     if (groupId) {
       const groupClients = await getClientsFromGroup(groupId);
@@ -350,7 +347,7 @@ const CampaignForm: React.FC = () => {
 
   const sendEmail = async (currentCampaignId: string, forceImmediate = false) => {
     let recipients: string[] = [];
-    let combinedClients: any[] = [];
+    let combinedClients: ClientRecord[] = [];
     
     if (selectedGroupId) {
       const groupClients = await getClientsFromGroup(selectedGroupId);

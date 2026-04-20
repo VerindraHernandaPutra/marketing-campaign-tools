@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Container, Title, Box, Grid, Select, Group, Button, Paper,
+  Title, Box, Grid, Select, Group, Button, Paper,
   Text, ThemeIcon, Tabs, Badge, Divider, SimpleGrid, Stack
 } from '@mantine/core';
 import {
@@ -10,6 +10,7 @@ import {
   Lightbulb, AlertTriangle, Trophy
 } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import MetricsCard from '../components/Analytics/MetricsCard';
 import EngagementChart from '../components/Analytics/EngagementChart';
 import PlatformBreakdown from '../components/Analytics/PlatformBreakdown';
@@ -216,30 +217,31 @@ const Analytics: React.FC = () => {
 
   return (
     <PageShell>
-      <Container size="xl" p={0}>
-        <Group justify="space-between" mb="xl">
-          <Box>
-            <Title order={2}>Marketing Analytics</Title>
-            <Text size="sm" c="dimmed" mt={2}>Period: {periodLabel}</Text>
-          </Box>
-          <Group>
-            <Button
-              variant="default"
-              leftSection={<RefreshCw size={16} className={fetchingAnalytics ? 'animate-spin' : ''} />}
-              onClick={() => refetchAnalytics()}
-              loading={fetchingAnalytics}
-            >
-              Refresh
-            </Button>
-            <Select
-              value={timeRange}
-              onChange={setTimeRange}
-              data={TIME_RANGE_OPTIONS}
-              w={160}
-              leftSection={<Clock size={14} />}
-            />
-          </Group>
-        </Group>
+        <PageHeader
+          icon={<TrendingUp size={22} />}
+          title="Insight"
+          subtitle={`Analytics & performance — Period: ${periodLabel}`}
+          gradient={{ from: 'orange', to: 'red' }}
+          action={
+            <Group>
+              <Button
+                variant="default"
+                leftSection={<RefreshCw size={16} className={fetchingAnalytics ? 'animate-spin' : ''} />}
+                onClick={() => refetchAnalytics()}
+                loading={fetchingAnalytics}
+              >
+                Refresh
+              </Button>
+              <Select
+                value={timeRange}
+                onChange={setTimeRange}
+                data={TIME_RANGE_OPTIONS}
+                w={160}
+                leftSection={<Clock size={14} />}
+              />
+            </Group>
+          }
+        />
 
         {/* AI Summary Banner */}
         <Paper p="xl" radius="lg" mb="xl" style={{
@@ -441,7 +443,6 @@ const Analytics: React.FC = () => {
             </Grid>
           </Tabs.Panel>
         </Tabs>
-      </Container>
     </PageShell>
   );
 };

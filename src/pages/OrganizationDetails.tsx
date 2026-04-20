@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Title, Table, Button, Group, Modal, Select, Loader, Badge, ActionIcon, Text, Paper, Breadcrumbs, Anchor, Tabs, TextInput, PasswordInput, Tooltip, Switch, SimpleGrid, Center, MantineProvider, Box } from '@mantine/core';
-import { useColorScheme } from '@mantine/hooks';
+import { Container, Title, Table, Button, Group, Modal, Select, Loader, Badge, ActionIcon, Text, Paper, Breadcrumbs, Anchor, Tabs, TextInput, PasswordInput, Tooltip, Switch, SimpleGrid, Box } from '@mantine/core';
 import { supabase } from '../supabaseClient';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
 import { useUserRole } from '../auth/UserContext';
 import { TrashIcon, EditIcon, PlusIcon, ArrowLeftIcon, UserPlusIcon, SearchIcon, BanIcon, CheckCircleIcon } from 'lucide-react';
-
-import '@mantine/core/styles.css';
 
 interface Member {
     id: string;
@@ -42,10 +39,6 @@ const OrganizationDetails: React.FC = () => {
     const navigate = useNavigate();
 
     const activeOrgId = isSuperAdmin ? paramOrgId : currentOrgId;
-
-    const preferredColorScheme = useColorScheme();
-    const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-    const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
 
     const [orgData, setOrgData] = useState<OrganizationData | null>(null);
     const [members, setMembers] = useState<Member[]>([]);
@@ -302,16 +295,13 @@ const OrganizationDetails: React.FC = () => {
     const [collapsed, setCollapsed] = useState(false);
 
     return (
-        <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-            <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
-                <DashboardSidebar collapsed={collapsed} />
+        <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
+            <DashboardSidebar collapsed={collapsed} />
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <DashboardHeader
-                        colorScheme={colorScheme}
-                        toggleColorScheme={toggleColorScheme}
-                        onToggleSidebar={() => setCollapsed(c => !c)}
-                    />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <DashboardHeader
+                    onToggleSidebar={() => setCollapsed(c => !c)}
+                />
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
                         <Container size="xl">
@@ -464,8 +454,7 @@ const OrganizationDetails: React.FC = () => {
                         {modalMode === 'add' ? (addMethod === 'new' ? 'Create & Add User' : 'Add User') : 'Save Changes'}
                     </Button>
                 </Modal>
-            </div>
-        </MantineProvider>
+        </div>
     );
 };
 

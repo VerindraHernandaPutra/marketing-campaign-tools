@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Title, Box, Group, Button, Text } from '@mantine/core';
+import { Container, Title, Group, Button, Text } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';

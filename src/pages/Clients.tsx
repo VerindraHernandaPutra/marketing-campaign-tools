@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Title,
   Button,
   Table,
   Group,
@@ -17,9 +17,10 @@ import {
   Badge,
   Tooltip
 } from '@mantine/core';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, SortAscIcon, PhoneIcon, MailIcon, MapPinIcon } from 'lucide-react';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, SortAscIcon, PhoneIcon, MailIcon, MapPinIcon, UsersIcon } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import PageShell from '../components/Dashboard/PageShell';
+import PageHeader from '../components/Dashboard/PageHeader';
 import { useAuth } from '../auth/useAuth';
 
 interface Client {
@@ -35,8 +36,6 @@ interface Client {
 
 const Clients: React.FC = () => {
   const { user } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(false);
   
   // -- Advanced Table States --
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,28 +50,25 @@ const Clients: React.FC = () => {
   // Form State
   const [formData, setFormData] = useState<Partial<Client>>({});
 
+  const { data: clients = [], isLoading: loading, refetch: fetchClients } = useQuery({
+    queryKey: ['clients', user?.id],
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Client[];
+    },
+  });
+
   // Reset pagination when filters/sort change
   useEffect(() => {
     setActivePage(1);
   }, [searchQuery, sortBy, itemsPerPage]);
-
-  const fetchClients = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) console.error(error);
-    else setClients(data || []);
-    setLoading(false);
-  }, [user]);
-
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
 
   // --- Data Processing (Search, Sort, Pagination) ---
   const processedClients = useMemo(() => {
@@ -117,18 +113,15 @@ const Clients: React.FC = () => {
   // --- Actions ---
   const handleSubmit = async () => {
     if (!user || !formData.name) return;
-    setLoading(true);
 
     try {
       if (editingClient) {
-        // Update
         const { error } = await supabase
           .from('clients')
           .update(formData)
           .eq('id', editingClient.id);
         if (error) throw error;
       } else {
-        // Create
         const { error } = await supabase
           .from('clients')
           .insert([{ ...formData, user_id: user.id }]);
@@ -138,11 +131,9 @@ const Clients: React.FC = () => {
       fetchClients();
       setFormData({});
       setEditingClient(null);
-    } catch (error: unknown) { 
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred';
       alert('Error saving client: ' + message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -166,15 +157,17 @@ const Clients: React.FC = () => {
 
   return (
     <PageShell>
-      <Group justify="space-between" mb="lg">
-        <div>
-            <Title order={3}>Clients</Title>
-            <Text c="dimmed" size="sm">Manage your customer database</Text>
-        </div>
-        <Button size="xs" leftSection={<PlusIcon size={13} />} onClick={() => openModal()}>
-          Add Client
-        </Button>
-      </Group>
+      <PageHeader
+        icon={<UsersIcon size={22} />}
+        title="Clients"
+        subtitle="Manage your customer database"
+        gradient={{ from: 'blue', to: 'violet' }}
+        action={
+          <Button leftSection={<PlusIcon size={16} />} variant="gradient" gradient={{ from: 'blue', to: 'violet' }} onClick={() => openModal()}>
+            Add Client
+          </Button>
+        }
+      />
       <Paper shadow="xs" p="md" withBorder>
             <LoadingOverlay visible={loading} />
 

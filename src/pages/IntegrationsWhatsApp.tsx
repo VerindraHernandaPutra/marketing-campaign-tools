@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Title, Card, Text, Button, Box, TextInput, PasswordInput,
+  Card, Text, Button, Box, TextInput, PasswordInput,
   Group, Stack, Alert, Badge, Divider, ThemeIcon, Paper, Anchor, List, Code
 } from '@mantine/core';
+import PageHeader from '../components/Dashboard/PageHeader';
 import {
   MessageCircleIcon, KeyIcon, CheckCircleIcon, Trash2Icon,
   RefreshCwIcon, PhoneIcon, AlertCircleIcon, ExternalLinkIcon, ShieldIcon
@@ -110,8 +111,9 @@ const IntegrationsWhatsApp = () => {
       });
       setStep('connected');
       notify.success('Connected!', `WhatsApp ${data.display_phone_number} is now linked via Meta Cloud API.`);
-    } catch (error: any) {
-      notify.error('Connection Failed', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Connection failed';
+      notify.error('Connection Failed', message);
     } finally {
       setLoading(false);
     }
@@ -145,21 +147,13 @@ const IntegrationsWhatsApp = () => {
 
   return (
     <PageShell>
-      <Box maw={800} mx="auto">
-        <Group gap="xs" align="center" mb={4}>
-          <ThemeIcon color="green" size="lg" radius="md">
-            <MessageCircleIcon size={18} />
-          </ThemeIcon>
-          <Title order={2}>WhatsApp Business</Title>
-          {step === 'connected' && (
-            <Badge color="green" variant="light" leftSection={<CheckCircleIcon size={12} />}>
-              Connected
-            </Badge>
-          )}
-        </Group>
-        <Text c="dimmed" size="sm" mb="xl">
-          Powered by <strong>Meta WhatsApp Cloud API</strong> — connect your WhatsApp Business number directly via Meta.
-        </Text>
+        <PageHeader
+          icon={<MessageCircleIcon size={22} />}
+          title="WhatsApp Business"
+          subtitle="Powered by Meta WhatsApp Cloud API — connect your WhatsApp Business number directly via Meta."
+          gradient={{ from: 'green', to: 'teal' }}
+          action={step === 'connected' ? <Badge color="green" variant="light" size="lg" leftSection={<CheckCircleIcon size={12} />}>Connected</Badge> : undefined}
+        />
 
         <Alert color="blue" variant="light" icon={<AlertCircleIcon size={14} />} mb="lg" title="Setup Guide">
           <Stack gap={6}>
@@ -307,7 +301,6 @@ const IntegrationsWhatsApp = () => {
             </Stack>
           </Card>
         )}
-      </Box>
     </PageShell>
   );
 };

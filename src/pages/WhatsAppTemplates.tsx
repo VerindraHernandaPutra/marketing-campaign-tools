@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Title, Card, Text, Button, Box, Group, Stack, Alert, Badge,
+  Card, Text, Button, Box, Group, Stack, Alert, Badge,
   Loader, Center, TextInput, Divider, Paper, ActionIcon,
   ThemeIcon
 } from '@mantine/core';
+import PageHeader from '../components/Dashboard/PageHeader';
 import {
   MessageSquareIcon, RefreshCwIcon, SearchIcon, CheckCircleIcon,
   XCircleIcon, ClockIcon, AlertCircleIcon, ChevronDownIcon, ChevronUpIcon
@@ -124,7 +125,7 @@ const WhatsAppTemplates: React.FC = () => {
   const [templates, setTemplates] = useState<WaTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [integration, setIntegration] = useState<any>(null);
+  const [integration, setIntegration] = useState<unknown>(null);
   const [hasIntegration, setHasIntegration] = useState<boolean | null>(null);
 
   const fetchIntegration = useCallback(async () => {
@@ -161,8 +162,9 @@ const WhatsAppTemplates: React.FC = () => {
 
       setTemplates(json.data || []);
       notify.success('Synced!', `Loaded ${(json.data || []).length} templates from Meta.`);
-    } catch (error: any) {
-      notify.error('Sync Failed', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to sync templates.';
+      notify.error('Sync Failed', message);
     } finally {
       setLoading(false);
     }
@@ -186,29 +188,24 @@ const WhatsAppTemplates: React.FC = () => {
 
   return (
     <PageShell>
-      <Box maw={900} mx="auto">
-        <Group justify="space-between" align="flex-start" mb="xl">
-          <Box>
-            <Group gap="xs" mb={4}>
-              <ThemeIcon color="green" size="lg" radius="md">
-                <MessageSquareIcon size={18} />
-              </ThemeIcon>
-              <Title order={2}>WhatsApp Templates</Title>
-            </Group>
-            <Text c="dimmed" size="sm">
-              View and sync your approved Meta message templates for WhatsApp campaigns.
-            </Text>
-          </Box>
-          <Button
-            leftSection={<RefreshCwIcon size={14} />}
-            color="green"
-            onClick={syncTemplates}
-            loading={loading}
-            disabled={hasIntegration === false}
-          >
-            Sync from Meta
-          </Button>
-        </Group>
+        <PageHeader
+          icon={<MessageSquareIcon size={22} />}
+          title="WhatsApp Templates"
+          subtitle="View and sync your approved Meta message templates for WhatsApp campaigns."
+          gradient={{ from: 'green', to: 'teal' }}
+          action={
+            <Button
+              leftSection={<RefreshCwIcon size={14} />}
+              variant="gradient"
+              gradient={{ from: 'green', to: 'teal' }}
+              onClick={syncTemplates}
+              loading={loading}
+              disabled={hasIntegration === false}
+            >
+              Sync from Meta
+            </Button>
+          }
+        />
 
         {hasIntegration === false && (
           <Alert color="orange" title="WhatsApp Not Connected" mb="lg" icon={<AlertCircleIcon size={16} />}>
@@ -312,7 +309,6 @@ const WhatsAppTemplates: React.FC = () => {
             <Text c="dimmed">No templates match your search.</Text>
           </Center>
         )}
-      </Box>
     </PageShell>
   );
 };

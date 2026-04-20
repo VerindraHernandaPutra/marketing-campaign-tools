@@ -12,8 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 
 interface DashboardHeaderProps {
-  colorScheme: string;
-  toggleColorScheme: () => void;
   onToggleSidebar?: () => void;
 }
 

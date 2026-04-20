@@ -11,7 +11,7 @@ interface WhatsappData {
 
 interface WhatsappFlowProps {
   data: WhatsappData;
-  onChange: (data: any) => void;
+  onChange: (data: WhatsappData) => void;
   title?: string;
   content?: string;
   previewMediaUrls?: string[];
@@ -52,8 +52,8 @@ const WhatsappFlow: React.FC<WhatsappFlowProps> = ({ data, onChange, title = '',
               device_name: integData.metadata?.device_name || 'My Device',
               device_status: integData.metadata?.device_status || 'connected',
             });
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);
         }

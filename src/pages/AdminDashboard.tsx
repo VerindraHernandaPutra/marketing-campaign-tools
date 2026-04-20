@@ -4,8 +4,6 @@ import { Container, Title, Tabs, Table, Button, Group, Modal, TextInput, Loader,
 import { supabase } from '../supabaseClient';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
-import { useColorScheme } from '@mantine/hooks';
-import { MantineProvider } from '@mantine/core';
 import { EditIcon, TrashIcon, UsersIcon, BanIcon, CheckCircleIcon, PlusIcon, BuildingIcon, ActivityIcon, SearchIcon, SortAscIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -35,9 +33,6 @@ interface ProfileWithRole {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(preferredColorScheme);
-  const toggleColorScheme = (value?: 'light' | 'dark') => setColorScheme(value || (colorScheme === 'dark' ? 'light' : 'dark'));
 
   const [activeTab, setActiveTab] = useState<string | null>('overview');
   
@@ -382,9 +377,8 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <MantineProvider theme={{}} forceColorScheme={colorScheme}>
-      <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-        <DashboardHeader colorScheme={colorScheme} toggleColorScheme={toggleColorScheme} />
+    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
+      <DashboardHeader />
         <div className="flex flex-1">
           <DashboardSidebar />
           <Container size="xl" py="xl" className="flex-1">
@@ -563,9 +557,9 @@ const AdminDashboard: React.FC = () => {
             </Tabs>
             </Paper>
           </Container>
-        </div>
+      </div>
 
-        {/* --- ORG MODAL --- */}
+      {/* --- ORG MODAL --- */}
         <Modal opened={isOrgModalOpen} onClose={() => setIsOrgModalOpen(false)} title={`${orgModalMode === 'create' ? 'Create' : 'Edit'} Organization`} size="lg">
           <TextInput label="Name" placeholder="Company Name" mb="md" value={orgFormName} onChange={(e) => setOrgFormName(e.target.value)} required />
           <Textarea label="Description" placeholder="Description (Optional)" mb="md" value={orgFormDesc} onChange={(e) => setOrgFormDesc(e.target.value)} />
@@ -597,8 +591,7 @@ const AdminDashboard: React.FC = () => {
             </Group>
             <Button fullWidth onClick={handleSaveUser}>{userModalMode === 'create' ? 'Create & Assign' : 'Update User'}</Button>
         </Modal>
-      </div>
-    </MantineProvider>
+    </div>
   );
 };
 

@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box, Group, Text, Badge, Paper, SimpleGrid, Loader, Center,
   ThemeIcon, ActionIcon, Tooltip, Select, TextInput, Table,
   Modal, Stack, Divider, Button, Avatar, ScrollArea
 } from '@mantine/core';
 import {
-  SearchIcon, EditIcon, TrashIcon, SendIcon, CalendarIcon,
+  SearchIcon, EditIcon, TrashIcon, CalendarIcon,
   ClockIcon, CheckCircleIcon, XCircleIcon, FileTextIcon,
-  RocketIcon, MailIcon, MessageCircleIcon, RefreshCwIcon, EyeIcon
+  RocketIcon, RefreshCwIcon, EyeIcon
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useUserRole } from '../../auth/UserContext';
@@ -48,6 +49,21 @@ const STATUS_META: Record<string, { color: string; icon: React.ReactNode; label:
   failed:     { color: 'red',    icon: <XCircleIcon size={14} />,      label: 'Failed'    },
   scheduling: { color: 'orange', icon: <RocketIcon size={14} />,       label: 'Processing'},
 };
+
+async function reconcileScheduledInList(rows: Campaign[]): Promise<Campaign[]> {
+  const nowTs = Date.now();
+  const overdueIds = rows
+    .filter(r => r.status === 'scheduled' && r.scheduled_date && new Date(r.scheduled_date).getTime() <= nowTs)
+    .map(r => r.id);
+  if (overdueIds.length === 0) return rows;
+  const { error } = await supabase
+    .from('marketing_campaigns')
+    .update({ status: 'sent' })
+    .in('id', overdueIds)
+    .eq('status', 'scheduled');
+  if (error) return rows;
+  return rows.map(r => overdueIds.includes(r.id) ? { ...r, status: 'sent' } : r);
+}
 
 // ─────────────── STAT CARD ───────────────
 const StatCard: React.FC<{
@@ -155,58 +171,34 @@ const CampaignDetailModal: React.FC<{
 const CampaignHistoryList: React.FC = () => {
   const { currentOrgId } = useUserRole();
   const navigate = useNavigate();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>('all');
   const [platformFilter, setPlatformFilter] = useState<string | null>('all');
-  const [stats, setStats] = useState<Stats>({ total: 0, scheduled: 0, sent: 0, draft: 0, failed: 0 });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
 
-  const reconcileScheduledCampaigns = useCallback(async (rows: Campaign[]) => {
-    const nowTs = Date.now();
-    const overdueIds = rows
-      .filter((row) => row.status === 'scheduled' && row.scheduled_date && new Date(row.scheduled_date).getTime() <= nowTs)
-      .map((row) => row.id);
+  const { data: campaigns = [], isLoading: loading, refetch: fetchCampaigns } = useQuery({
+    queryKey: ['scheduled-campaigns', currentOrgId],
+    enabled: !!currentOrgId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('organization_id', currentOrgId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return reconcileScheduledInList((data || []) as Campaign[]);
+    },
+  });
 
-    if (overdueIds.length === 0) return rows;
-
-    const { error } = await supabase
-      .from('marketing_campaigns')
-      .update({ status: 'sent' })
-      .in('id', overdueIds)
-      .eq('status', 'scheduled');
-
-    if (error) return rows;
-
-    return rows.map((row) => overdueIds.includes(row.id) ? { ...row, status: 'sent' } : row);
-  }, []);
-
-  const fetchCampaigns = useCallback(async () => {
-    if (!currentOrgId) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('marketing_campaigns')
-      .select('*')
-      .eq('organization_id', currentOrgId)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      const reconciled = await reconcileScheduledCampaigns(data as Campaign[]);
-      setCampaigns(reconciled);
-      setStats({
-        total: reconciled.length,
-        scheduled: reconciled.filter(c => c.status === 'scheduled').length,
-        sent: reconciled.filter(c => c.status === 'sent').length,
-        draft: reconciled.filter(c => c.status === 'draft').length,
-        failed: reconciled.filter(c => c.status === 'failed').length,
-      });
-    }
-    setLoading(false);
-  }, [currentOrgId, reconcileScheduledCampaigns]);
-
-  useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+  const stats = useMemo<Stats>(() => ({
+    total: campaigns.length,
+    scheduled: campaigns.filter(c => c.status === 'scheduled').length,
+    sent: campaigns.filter(c => c.status === 'sent').length,
+    draft: campaigns.filter(c => c.status === 'draft').length,
+    failed: campaigns.filter(c => c.status === 'failed').length,
+  }), [campaigns]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this campaign?')) return;

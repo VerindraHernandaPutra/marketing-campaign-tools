@@ -229,22 +229,40 @@ const CanvaEditor: React.FC = () => {
 
   const handleSaveProject = async () => {
     if (!projectId || !canvas) return;
-    
+
     const originalViewport = canvas.viewportTransform;
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-    
+
     const dataURL = canvas.toDataURL({ format: 'png', quality: 0.8, multiplier: 0.5 });
 
     if (originalViewport) canvas.setViewportTransform(originalViewport);
 
+    // Upload thumbnail to Storage instead of storing base64 in the DB row
+    let thumbnailUrl: string | null = null;
+    try {
+      const blob = await fetch(dataURL).then(r => r.blob());
+      const filePath = `${projectId}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('project-thumbnails')
+        .upload(filePath, blob, { upsert: true, contentType: 'image/png' });
+      if (!uploadError) {
+        const { data } = supabase.storage.from('project-thumbnails').getPublicUrl(filePath);
+        thumbnailUrl = data.publicUrl;
+      }
+    } catch {
+      // Non-fatal — save continues without thumbnail update
+    }
+
     const baseJson = canvas.toJSON();
     const canvasJson = { ...baseJson, width: dimensions.width, height: dimensions.height, backgroundColor: '#ffffff' };
 
-    const { error } = await supabase.from('projects').update({ 
-        canvas_data: canvasJson, 
-        thumbnail_url: dataURL, 
-        updated_at: new Date().toISOString() 
-    }).eq('id', projectId);
+    const updatePayload: Record<string, unknown> = {
+      canvas_data: canvasJson,
+      updated_at: new Date().toISOString(),
+    };
+    if (thumbnailUrl) updatePayload.thumbnail_url = thumbnailUrl;
+
+    const { error } = await supabase.from('projects').update(updatePayload).eq('id', projectId);
 
     if (error) notify.error('Save Failed', error.message);
     else notify.success('Project Saved', 'Your design has been saved successfully.');

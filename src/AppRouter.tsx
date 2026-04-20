@@ -1,91 +1,99 @@
-// [cite: src/AppRouter.tsx]
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { App } from './App';
-import Dashboard from './pages/Dashboard';
-import CampaignManager from './pages/CampaignManager';
-import CampaignCreate from './pages/CampaignCreate';
-import ScheduledPosts from './pages/ScheduledPosts';
-import WhatsAppTest from './pages/WhatsAppTest';
-import Analytics from './pages/Analytics';
-import Projects from './pages/Projects';
-import Folders from './pages/Folders';
-import Templates from './pages/Templates';
-import Campaigns from './pages/Campaigns';
-import DesignDashboard from './pages/DesignDashboard';
-import Clients from './pages/Clients';
-import Groups from './pages/Groups';
-import Profile from './pages/Profile';
-import AdminDashboard from './pages/AdminDashboard';
-import OrganizationDetails from './pages/OrganizationDetails';
-import { LoginPage } from './pages/LoginPage';
+import { Center, Loader } from '@mantine/core';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { RoleGuard } from './components/Auth/RoleGuard';
-import IntegrationsWhatsApp from './pages/IntegrationsWhatsApp';
-import IntegrationsInstagram from './pages/IntegrationsInstagram';
-import IntegrationsMessenger from './pages/IntegrationsMessenger';
-import IntegrationsResend from './pages/IntegrationsResend';
-import Inbox from './pages/Inbox';
-import WhatsAppTemplates from './pages/WhatsAppTemplates';
-import MetaOAuthCallback from './pages/MetaOAuthCallback';
+
+// Lazy-loaded pages — each becomes its own JS chunk
+const Dashboard            = lazy(() => import('./pages/Dashboard'));
+const LoginPage            = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const Profile              = lazy(() => import('./pages/Profile'));
+const AdminDashboard       = lazy(() => import('./pages/AdminDashboard'));
+const OrganizationDetails  = lazy(() => import('./pages/OrganizationDetails'));
+const Groups               = lazy(() => import('./pages/Groups'));
+const Clients              = lazy(() => import('./pages/Clients'));
+const DesignDashboard      = lazy(() => import('./pages/DesignDashboard'));
+const Projects             = lazy(() => import('./pages/Projects'));
+const App                  = lazy(() => import('./App').then(m => ({ default: m.App })));
+const Templates            = lazy(() => import('./pages/Templates'));
+const Folders              = lazy(() => import('./pages/Folders'));
+const Inbox                = lazy(() => import('./pages/Inbox'));
+const CampaignCreate       = lazy(() => import('./pages/CampaignCreate'));
+const ScheduledPosts       = lazy(() => import('./pages/ScheduledPosts'));
+const Analytics            = lazy(() => import('./pages/Analytics'));
+const WhatsAppTest         = lazy(() => import('./pages/WhatsAppTest'));
+const WhatsAppTemplates    = lazy(() => import('./pages/WhatsAppTemplates'));
+const Campaigns            = lazy(() => import('./pages/Campaigns'));
+const IntegrationsWhatsApp = lazy(() => import('./pages/IntegrationsWhatsApp'));
+const IntegrationsInstagram= lazy(() => import('./pages/IntegrationsInstagram'));
+const IntegrationsMessenger= lazy(() => import('./pages/IntegrationsMessenger'));
+const IntegrationsResend   = lazy(() => import('./pages/IntegrationsResend'));
+const MetaOAuthCallback    = lazy(() => import('./pages/MetaOAuthCallback'));
+
+const PageLoader = () => (
+  <Center h="100vh">
+    <Loader size="sm" color="blue" />
+  </Center>
+);
 
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/integrations/meta-callback" element={<MetaOAuthCallback />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/integrations/meta-callback" element={<MetaOAuthCallback />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/integrations/whatsapp" element={<IntegrationsWhatsApp />} />
-          <Route path="/integrations/instagram" element={<IntegrationsInstagram />} />
-          <Route path="/integrations/messenger" element={<IntegrationsMessenger />} />
-          <Route path="/integrations/resend" element={<IntegrationsResend />} />
-          <Route path="/integrations" element={<Navigate to="/integrations/messenger" replace />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/integrations/whatsapp" element={<IntegrationsWhatsApp />} />
+            <Route path="/integrations/instagram" element={<IntegrationsInstagram />} />
+            <Route path="/integrations/messenger" element={<IntegrationsMessenger />} />
+            <Route path="/integrations/resend" element={<IntegrationsResend />} />
+            <Route path="/integrations" element={<Navigate to="/integrations/messenger" replace />} />
 
-          {/* SUPER ADMIN */}
-          <Route element={<RoleGuard allowedRoles={['admin']} />}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            {/* Admin drill-down view */}
-            <Route path="/admin/organization/:orgId" element={<OrganizationDetails />} />
+            {/* SUPER ADMIN */}
+            <Route element={<RoleGuard allowedRoles={['admin']} />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/organization/:orgId" element={<OrganizationDetails />} />
+            </Route>
+
+            {/* OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['operator']} />}>
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/organization/users" element={<OrganizationDetails />} />
+            </Route>
+
+            {/* DESIGNER & OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['designer', 'operator']} />}>
+              <Route path="/design-dashboard" element={<DesignDashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/editor/:projectId" element={<App />} />
+              <Route path="/templates" element={<Templates />} />
+              <Route path="/folders" element={<Folders />} />
+            </Route>
+
+            {/* MARKETER & OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['marketer', 'operator']} />}>
+              <Route path="/inbox" element={<Inbox />} />
+              <Route path="/campaign-manager" element={<ScheduledPosts />} />
+              <Route path="/campaign-manager/new" element={<CampaignCreate />} />
+              <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
+              <Route path="/scheduled" element={<Navigate to="/campaign-manager" replace />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/wa-test" element={<WhatsAppTest />} />
+              <Route path="/wa-templates" element={<WhatsAppTemplates />} />
+            </Route>
+
+            {/* DESIGNER, MARKETER & OPERATOR */}
+            <Route element={<RoleGuard allowedRoles={['designer', 'marketer', 'operator']} />}>
+              <Route path="/campaigns" element={<Campaigns />} />
+            </Route>
           </Route>
-
-          {/* OPERATOR - Organization Management */}
-          <Route element={<RoleGuard allowedRoles={['operator']} />}>
-            <Route path="/groups" element={<Groups />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/organization/users" element={<OrganizationDetails />} />
-          </Route>
-
-          {/* DESIGNER & OPERATOR */}
-          <Route element={<RoleGuard allowedRoles={['designer', 'operator']} />}>
-            <Route path="/design-dashboard" element={<DesignDashboard />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/editor/:projectId" element={<App />} />
-            <Route path="/templates" element={<Templates />} />
-            <Route path="/folders" element={<Folders />} />
-          </Route>
-
-          {/* MARKETER & OPERATOR */}
-          <Route element={<RoleGuard allowedRoles={['marketer', 'operator']} />}>
-            <Route path="/inbox" element={<Inbox />} />
-            <Route path="/campaign-manager" element={<CampaignManager />} />
-            <Route path="/campaign-manager/new" element={<CampaignCreate />} />
-            <Route path="/campaign-manager/edit/:campaignId" element={<CampaignCreate />} />
-            <Route path="/scheduled" element={<ScheduledPosts />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/wa-test" element={<WhatsAppTest />} />
-            <Route path="/wa-templates" element={<WhatsAppTemplates />} />
-          </Route>
-
-          {/* DESIGNER, MARKETER & OPERATOR — Campaign Designs overview */}
-          <Route element={<RoleGuard allowedRoles={['designer', 'marketer', 'operator']} />}>
-            <Route path="/campaigns" element={<Campaigns />} />
-          </Route>
-
-        </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
