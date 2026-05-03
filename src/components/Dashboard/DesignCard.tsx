@@ -26,7 +26,8 @@ interface DesignCardProps {
     updated_at?: string | null;
     category?: string;
     canvas_data?: unknown;
-    tags?: string[] | null; 
+    tags?: string[] | null;
+    is_template?: boolean;
   };
   isTemplate?: boolean;
   onRefresh?: () => void;

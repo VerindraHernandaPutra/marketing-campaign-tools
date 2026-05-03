@@ -499,7 +499,7 @@ const DashboardContent: React.FC = () => {
            <MetricsCard title="Total Reach" value="12.5k" change={5.4} trend="up" />
            <MetricsCard title="Engagement Rate" value="4.2%" change={-1.1} trend="down" />
         </SimpleGrid>
-        <EngagementChart />
+        <EngagementChart data={[]} />
       </>
     );
   }
@@ -655,18 +655,18 @@ const DashboardContent: React.FC = () => {
                 <Group>
                     <ViewToggle />
                     {activeTab === 'recent' && (
-                        <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
+                        <Button variant="subtle" size="sm" onClick={() => fetchAllProjects()} color="blue">Refresh</Button>
                     )}
                     {activeTab === 'templates' && (
                         <>
                             {canCreateTemplates && <Button leftSection={<PlusIcon size={16} />} onClick={() => setIsTemplateModalOpen(true)}>New Template</Button>}
-                            <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
+                            <Button variant="subtle" size="sm" onClick={() => fetchAllProjects()} color="blue">Refresh</Button>
                         </>
                     )}
                     {activeTab === 'campaigns' && (
                         <>
                             <Button leftSection={<PlusIcon size={16} />} onClick={() => setIsDesignModalOpen(true)}>New Design</Button>
-                            <Button variant="subtle" size="sm" onClick={fetchAllProjects} color="blue">Refresh</Button>
+                            <Button variant="subtle" size="sm" onClick={() => fetchAllProjects()} color="blue">Refresh</Button>
                         </>
                     )}
                 </Group>

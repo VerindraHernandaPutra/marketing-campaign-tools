@@ -38,13 +38,13 @@ export const whatsappService = {
     /**
      * Subscribe to changes for real-time updates in UI
      */
-    subscribeToMessage(messageId: number, onUpdate: (payload: unknown) => void) {
+    subscribeToMessage(messageId: number, onUpdate: (row: WhatsAppMessage) => void) {
         return supabase
             .channel(`message-${messageId}`)
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'whatsapp_outbox', filter: `id=eq.${messageId}` },
-                (payload) => onUpdate(payload.new)
+                (payload) => onUpdate(payload.new as WhatsAppMessage)
             )
             .subscribe();
     }

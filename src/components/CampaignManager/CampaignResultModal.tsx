@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Box, Text, Button, Group, ThemeIcon, Stack, Badge, Divider } from '@mantine/core';
+import { Modal, Box, Text, Button, Group, Stack, Badge, Divider } from '@mantine/core';
 import {
   CheckCircleIcon, XCircleIcon, CalendarIcon, BookmarkIcon,
   RocketIcon, ClockIcon, ArrowRightIcon, RefreshCwIcon

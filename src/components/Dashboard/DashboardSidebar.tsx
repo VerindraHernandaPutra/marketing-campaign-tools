@@ -160,15 +160,68 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
           flexShrink: 0,
           height: '100vh',
           transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
+          overflow: 'hidden',
           backgroundColor: 'white',
         }}
       >
-        <ScrollArea h="100%">
-          <Box p={collapsed ? 8 : 'sm'}>
+        <ScrollArea h="100%" scrollbarSize={4}>
+
+          {/* Branding */}
+          <Box
+            px={collapsed ? 6 : 10}
+            pt={10}
+            pb={8}
+            style={{ borderBottom: '1px solid var(--mantine-color-gray-1)' }}
+          >
+            {collapsed ? (
+              <Tooltip label="Marketing Platform · Super Admin" position="right" withArrow>
+                <Box style={{ display: 'flex', justifyContent: 'center' }}>
+                  <Avatar size={30} radius="md" variant="light" style={{ background: '#ef444418', color: '#ef4444' }}>
+                    <ShieldIcon size={15} />
+                  </Avatar>
+                </Box>
+              </Tooltip>
+            ) : (
+              <Box>
+                <Box style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <Avatar size={28} radius="md" variant="light" style={{ background: '#ef444418', color: '#ef4444' }}>
+                    <ShieldIcon size={15} />
+                  </Avatar>
+                  <Box style={{ overflow: 'hidden', flex: 1 }}>
+                    <Text size="xs" fw={500} truncate style={{ lineHeight: 1.3, fontSize: '0.78rem' }}>
+                      Marketing Platform
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate style={{ fontSize: '0.64rem', lineHeight: 1.2 }}>
+                      System Administration
+                    </Text>
+                  </Box>
+                </Box>
+                <Box style={{ display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 4, padding: '2px 7px', backgroundColor: '#f3f4f6' }}>
+                  <Box style={{ color: '#ef4444' }}><ShieldIcon size={10} /></Box>
+                  <Text style={{ fontSize: '0.66rem', color: '#ef4444', fontWeight: 400 }}>Super Admin</Text>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* Nav items */}
+          <Box px={collapsed ? 6 : 8} py={8}>
+
+            {!collapsed && <SectionLabel>Overview</SectionLabel>}
             <NavItem
-              label="Super Admin"
+              label="Dashboard"
+              icon={<HomeIcon size={14} />}
+              active={isActive('/', true)}
+              onClick={() => navigate('/')}
+              collapsed={collapsed}
+            />
+
+            {collapsed ? <Divider my={6} /> : <Divider my={8} />}
+            {!collapsed && <SectionLabel>Administration</SectionLabel>}
+            <NavItem
+              label="Admin Console"
               icon={<ShieldIcon size={14} />}
-              active={isActive('/admin')}
+              active={isActive('/admin', true)}
               onClick={() => navigate('/admin')}
               collapsed={collapsed}
             />

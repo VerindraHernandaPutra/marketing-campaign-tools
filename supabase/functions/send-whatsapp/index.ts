@@ -66,7 +66,7 @@ serve(async (req) => {
     const orgName = orgData ? orgData.name : 'Your Organization';
 
     // 5. Construct Meta API Payload
-    let messagePayload: any = {
+    const messagePayload: Record<string, unknown> = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
         to: cleanNumber
@@ -81,30 +81,24 @@ serve(async (req) => {
             language: { code: taskMetadata.template_language || 'en_US' }
         };
         
-        if (message && message.trim() !== '' && message !== 'hello_world') {
-            const params = [];
-            const pCount = taskMetadata.param_count || 1;
-            
-            if (pCount >= 2) {
-                 params.push({ type: "text", text: orgName });
-                 params.push({ type: "text", text: message });
-            } else {
-                 params.push({ type: "text", text: message });
-            }
+        const pCount = taskMetadata.param_count ?? 0;
+        if (pCount > 0) {
+            // Template params must not contain newlines — join title and content with colon
+            const titlePart = taskMetadata.title ? String(taskMetadata.title).trim() : '';
+            const contentPart = taskMetadata.content ? String(taskMetadata.content).trim() : '';
+            const cleanMessage = [titlePart, contentPart].filter(Boolean).join(' | ');
 
+            const params = [];
+            if (pCount >= 2) {
+                params.push({ type: "text", text: orgName });
+                params.push({ type: "text", text: cleanMessage || orgName });
+            } else {
+                params.push({ type: "text", text: cleanMessage || orgName });
+            }
             messagePayload.template.components = [
-                {
-                    type: "body",
-                    parameters: params
-                }
+                { type: "body", parameters: params }
             ];
         }
-    } else if (message === 'hello_world') {
-        messagePayload.type = 'template';
-        messagePayload.template = {
-            name: 'hello_world',
-            language: { code: 'en_US' }
-        };
     } else {
         messagePayload.type = 'text';
         messagePayload.text = { body: message };
@@ -149,9 +143,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("WhatsApp worker error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { 
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: msg }), { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card, Text, Button, Box, TextInput, PasswordInput,
   Group, Stack, Alert, Badge, Divider, ThemeIcon, Paper, Anchor, List, Code
@@ -122,11 +122,13 @@ const IntegrationsWhatsApp = () => {
   const handleDisconnect = async () => {
     if (!confirm('Disconnect WhatsApp? Campaign messages and inbox will stop working.')) return;
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('disconnect-integration', {
-      body: { organizationId: currentOrgId, platformPrefix: 'whatsapp' },
-    });
-    if (error || data?.error) {
-      notify.error('Disconnect Failed', data?.error || error?.message || 'Could not disconnect.');
+    const { error } = await supabase
+      .from('organization_integrations')
+      .delete()
+      .eq('organization_id', currentOrgId)
+      .ilike('platform', 'whatsapp%');
+    if (error) {
+      notify.error('Disconnect Failed', error.message || 'Could not disconnect.');
       setLoading(false);
       return;
     }
@@ -180,6 +182,13 @@ const IntegrationsWhatsApp = () => {
             <Text size="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
               {webhookUrl}
             </Text>
+            <Divider my={4} />
+            <Divider my={4} />
+            <Text size="xs" fw={600} c="orange.7">Test Number vs. Registered Number</Text>
+            <List size="xs" spacing={4}>
+              <List.Item><strong>Test number (free):</strong> Meta provides a shared test number you can use during development — no payment method required, but you can only message pre-verified recipient numbers.</List.Item>
+              <List.Item><strong>Registered number (paid):</strong> Register your own WhatsApp Business number in Meta Developer Console. Requires adding a payment method to your WABA. Once registered, you can send to hundreds of contacts at once without verifying each recipient.</List.Item>
+            </List>
             <Divider my={4} />
             <Text size="xs" fw={600}>Troubleshooting Checklist</Text>
             <List size="xs" spacing={4}>

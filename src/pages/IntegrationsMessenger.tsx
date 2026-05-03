@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Title, Card, Text, Button, List, LoadingOverlay, Badge, Group, Box, Avatar, Modal, ThemeIcon, Paper, Flex,
-  Alert, Divider, Stack
+  Alert, Divider, Stack, Anchor, Code
 } from '@mantine/core';
-import { MessagesSquareIcon, PlusIcon, TrashIcon, CheckCircle2Icon, ShieldCheckIcon, InfoIcon, CheckCircleIcon } from 'lucide-react';
+import { MessagesSquareIcon, PlusIcon, TrashIcon, CheckCircle2Icon, ShieldCheckIcon, InfoIcon, CheckCircleIcon, AlertTriangleIcon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
 import PageHeader from '../components/Dashboard/PageHeader';
 import { supabase } from '../supabaseClient';
@@ -14,7 +14,7 @@ interface Integration {
   id: string;
   platform: string;
   provider_account_id: string;
-  metadata?: unknown;
+  metadata?: Record<string, string>;
 }
 
 const IntegrationsMessenger = () => {
@@ -45,11 +45,13 @@ const IntegrationsMessenger = () => {
 
     const handleDisconnectAll = async () => {
         if (!window.confirm('Are you sure you want to disconnect all Facebook Pages?')) return;
-        const { data, error } = await supabase.functions.invoke('disconnect-integration', {
-            body: { organizationId: currentOrgId, platformPrefix: 'facebook' },
-        });
-        if (error || data?.error) {
-            alert(data?.error || error?.message || 'Failed to disconnect Facebook integration.');
+        const { error } = await supabase
+            .from('organization_integrations')
+            .delete()
+            .eq('organization_id', currentOrgId)
+            .ilike('platform', 'facebook%');
+        if (error) {
+            alert(error.message || 'Failed to disconnect Facebook integration.');
             return;
         }
         setIntegrations([]);
@@ -67,12 +69,21 @@ const IntegrationsMessenger = () => {
                     action={integrations.length > 0 ? <Badge color="green" variant="light" size="lg" leftSection={<CheckCircleIcon size={12} />}>Connected</Badge> : undefined}
                 />
 
+                <Alert icon={<AlertTriangleIcon size={16} />} title="Meta Account Requirement" color="orange" mb="sm">
+                    <Text size="sm">
+                        WhatsApp Business, Instagram Business, and Facebook Page <strong>must all be connected under the same Meta Business account</strong>.
+                        Manage your linked accounts at <Anchor href="https://accountscenter.facebook.com/" target="_blank" size="sm">Meta Account Setting → Settings</Anchor> before connecting here.
+                    </Text>
+                </Alert>
+
                 <Alert icon={<InfoIcon size={16} />} title="Setup Guide" color="blue" mb="lg">
                     <Stack gap={4}>
-                        <Text size="sm"><strong>Step 1:</strong> Click <strong>Connect via Meta</strong> below.</Text>
-                        <Text size="sm"><strong>Step 2:</strong> Login to Facebook and grant required Page permissions.</Text>
-                        <Text size="sm"><strong>Step 3:</strong> Select pages you want to connect.</Text>
-                        <Text size="sm"><strong>Step 4:</strong> Return here and verify connected pages in the list.</Text>
+                        <Text size="sm"><strong>Step 1:</strong> Make sure you have a <strong>Facebook Page</strong> (not a personal profile). Create one at <Anchor href="https://www.facebook.com/pages/create" target="_blank" size="sm">facebook.com/pages/create</Anchor> if needed.</Text>
+                        <Text size="sm"><strong>Step 2:</strong> In <Anchor href="https://developers.facebook.com" target="_blank" size="sm">Meta Developer Console</Anchor>, create or open your App → add <strong>Messenger</strong> product → complete Business Verification if prompted.</Text>
+                        <Text size="sm"><strong>Step 3:</strong> Click <strong>Connect via Meta</strong> below, log in to Facebook, and grant the requested permissions including <Code>pages_messaging</Code> and <Code>pages_manage_metadata</Code>.</Text>
+                        <Text size="sm"><strong>Step 4:</strong> Select all Facebook Pages you want to connect for Messenger inbox.</Text>
+                        <Text size="sm"><strong>Step 5:</strong> In your Meta App → Messenger → <strong>Webhooks</strong>, subscribe to the <strong>messages</strong> and <strong>messaging_postbacks</strong> fields on each connected page.</Text>
+                        <Text size="sm"><strong>Step 6:</strong> Return here and verify connected Pages appear in the list below.</Text>
                     </Stack>
                 </Alert>
 

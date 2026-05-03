@@ -120,7 +120,7 @@ const Canvas: React.FC<CanvasProps> = ({
           localCanvas.renderAll();
 
           setTimeout(() => {
-             if (localCanvas && !localCanvas.isDisposed) { 
+             if (localCanvas && !localCanvas.disposed) { 
                  localCanvas.requestRenderAll();
              }
           }, 100);

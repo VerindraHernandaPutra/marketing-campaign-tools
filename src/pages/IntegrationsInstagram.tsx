@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Card, Text, Button, List, LoadingOverlay, Badge, Group, Box, Avatar, Alert, Stack, Divider } from '@mantine/core';
-import { InstagramIcon, PlusIcon, TrashIcon, InfoIcon, CheckCircleIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Card, Text, Button, List, LoadingOverlay, Badge, Group, Box, Avatar, Alert, Stack, Divider, Anchor, Code } from '@mantine/core';
+import { InstagramIcon, PlusIcon, TrashIcon, InfoIcon, CheckCircleIcon, AlertTriangleIcon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
 import PageHeader from '../components/Dashboard/PageHeader';
 import { supabase } from '../supabaseClient';
@@ -11,7 +11,7 @@ interface Integration {
   id: string;
   platform: string;
   provider_account_id: string;
-  metadata?: unknown;
+  metadata?: Record<string, string>;
 }
 
 const IntegrationsInstagram = () => {
@@ -45,15 +45,14 @@ const IntegrationsInstagram = () => {
         if (!currentOrgId) return;
 
         setLoading(true);
-        const { data, error } = await supabase.functions.invoke('disconnect-integration', {
-            body: {
-                organizationId: currentOrgId,
-                platformPrefix: 'instagram'
-            }
-        });
+        const { error } = await supabase
+            .from('organization_integrations')
+            .delete()
+            .eq('organization_id', currentOrgId)
+            .ilike('platform', 'instagram%');
 
-        if (error || data?.error) {
-            alert(data?.error || error?.message || 'Failed to disconnect Instagram integration.');
+        if (error) {
+            alert(error.message || 'Failed to disconnect Instagram integration.');
             setLoading(false);
             return;
         }
@@ -74,12 +73,21 @@ const IntegrationsInstagram = () => {
                     action={integrations.length > 0 ? <Badge color="green" variant="light" size="lg" leftSection={<CheckCircleIcon size={12} />}>Connected</Badge> : undefined}
                 />
 
+                <Alert icon={<AlertTriangleIcon size={16} />} title="Meta Account Requirement" color="orange" mb="sm">
+                    <Text size="sm">
+                        WhatsApp Business, Instagram Business, and Facebook Page <strong>must all be connected under the same Meta Business account</strong>.
+                        Go to <Anchor href="https://accountscenter.facebook.com/" target="_blank" size="sm">Meta Account Setting</Anchor> to link your accounts before proceeding.
+                    </Text>
+                </Alert>
+
                 <Alert icon={<InfoIcon size={16} />} title="Setup Guide" color="blue" mb="lg">
                     <Stack gap={4}>
-                        <Text size="sm"><strong>Step 1:</strong> Click <strong>Connect via Meta</strong>.</Text>
-                        <Text size="sm"><strong>Step 2:</strong> Login Facebook and authorize required permissions.</Text>
-                        <Text size="sm"><strong>Step 3:</strong> Select the Facebook Page linked to your Instagram Business account.</Text>
-                        <Text size="sm"><strong>Step 4:</strong> Confirm the account appears below as connected.</Text>
+                        <Text size="sm"><strong>Step 1:</strong> Make sure your Instagram account is set to <strong>Professional (Business)</strong> mode — go to Instagram app → Settings → Account → Switch to Professional Account.</Text>
+                        <Text size="sm"><strong>Step 2:</strong> Link your Instagram Business account to a Facebook Page in <Anchor href="https://accountscenter.facebook.com/" target="_blank" size="sm">Meta Account Setting</Anchor>.</Text>
+                        <Text size="sm"><strong>Step 3:</strong> In <Anchor href="https://developers.facebook.com" target="_blank" size="sm">Meta Developer Console</Anchor>, create or open your App → add <strong>Instagram Graph API</strong> product → complete Business Verification if prompted.</Text>
+                        <Text size="sm"><strong>Step 4:</strong> Click <strong>Connect via Meta</strong> below, log in to Facebook, and grant the requested permissions.</Text>
+                        <Text size="sm"><strong>Step 5:</strong> Select the <strong>Facebook Page</strong> that is linked to your Instagram Business account.</Text>
+                        <Text size="sm"><strong>Step 6:</strong> Confirm the Instagram account appears in the list below as connected. Required permissions: <Code>instagram_basic</Code>, <Code>instagram_manage_messages</Code>, <Code>pages_show_list</Code>.</Text>
                     </Stack>
                 </Alert>
 

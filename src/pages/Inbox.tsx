@@ -267,7 +267,7 @@ export default function Inbox() {
           <Box
             w={{ base: '100%', sm: 320 }}
             style={{ borderRight: '1px solid #e9ecef', display: 'flex', flexDirection: 'column' }}
-            display={{ base: activeConvo ? 'none' : 'flex', sm: 'flex' } as unknown}
+            display={{ base: activeConvo ? ('none' as const) : ('flex' as const), sm: 'flex' as const }}
           >
             <Box p="md" pb={0}>
               <Text fw={700} size="lg" mb="sm">Omnichannel Inbox</Text>
@@ -364,7 +364,7 @@ export default function Inbox() {
           {/* ─── RIGHT: Chat Thread ─── */}
           <Box
             style={{ flex: 1, flexDirection: 'column', backgroundColor: '#f9fafb', minWidth: 0 }}
-            display={{ base: activeConvo ? 'flex' : 'none', sm: 'flex' } as unknown}
+            display={{ base: activeConvo ? ('flex' as const) : ('none' as const), sm: 'flex' as const }}
           >
             {!activeConvo ? (
               <Flex direction="column" align="center" justify="center" h="100%" c="dimmed">

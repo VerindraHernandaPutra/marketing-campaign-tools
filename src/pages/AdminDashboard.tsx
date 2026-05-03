@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 import DashboardHeader from '../components/Dashboard/DashboardHeader';
 import DashboardSidebar from '../components/Dashboard/DashboardSidebar';
 import { EditIcon, TrashIcon, UsersIcon, BanIcon, CheckCircleIcon, PlusIcon, BuildingIcon, ActivityIcon, SearchIcon, SortAscIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface Organization {
@@ -33,8 +33,11 @@ interface ProfileWithRole {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState<string | null>('overview');
+  const [activeTab, setActiveTab] = useState<string | null>(
+    (location.state as { tab?: string })?.tab || 'overview'
+  );
   
   const [orgList, setOrgList] = useState<Organization[]>([]);
   const [userList, setUserList] = useState<ProfileWithRole[]>([]);
@@ -93,7 +96,8 @@ const AdminDashboard: React.FC = () => {
             const membership = memberships?.find((m: any) => m.user_id === p.id);
             return {
                 ...p,
-                organization_name: membership?.organizations?.name || '-',
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                organization_name: (membership?.organizations as any)?.name || '-',
                 role: membership?.role || '-',
                 organization_id: membership?.organization_id,
                 membership_id: membership?.id,
@@ -238,7 +242,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteOrg = async (id: string) => {
-    if (!confirm("Are you sure? This will delete the organization.")) return;
+    if (!confirm("Are you sure? This will permanently delete the organization and all its data.")) return;
     const { error } = await supabase.from('organizations').delete().eq('id', id);
     if (error) alert(error.message);
     else fetchData();
@@ -376,12 +380,15 @@ const AdminDashboard: React.FC = () => {
     </Group>
   );
 
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-      <DashboardHeader />
-        <div className="flex flex-1">
-          <DashboardSidebar />
-          <Container size="xl" py="xl" className="flex-1">
+    <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
+      <DashboardSidebar collapsed={collapsed} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <DashboardHeader onToggleSidebar={() => setCollapsed(c => !c)} />
+        <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+          <Container size="xl">
             <Group justify="space-between" mb="xl">
               <div>
                 <Title order={2}>Super Admin Console</Title>
@@ -557,6 +564,7 @@ const AdminDashboard: React.FC = () => {
             </Tabs>
             </Paper>
           </Container>
+        </div>
       </div>
 
       {/* --- ORG MODAL --- */}

@@ -166,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
           obj.set('name', tempLayerName);
           setLayers(prev => {
               const newLayers = [...prev];
-              newLayers[index] = { ...obj, name: tempLayerName };
+              newLayers[index] = obj;
               return newLayers;
           });
       }

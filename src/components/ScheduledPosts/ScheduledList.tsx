@@ -275,7 +275,7 @@ const CampaignHistoryList: React.FC = () => {
           />
         </Group>
         <Tooltip label="Refresh">
-          <ActionIcon variant="light" color="gray" onClick={fetchCampaigns}>
+          <ActionIcon variant="light" color="gray" onClick={() => fetchCampaigns()}>
             <RefreshCwIcon size={15} />
           </ActionIcon>
         </Tooltip>
@@ -293,7 +293,7 @@ const CampaignHistoryList: React.FC = () => {
         </Center>
       ) : (
         <ScrollArea>
-          <Table striped highlightOnHover verticalSpacing="sm" withTableBorder radius="lg">
+          <Table striped highlightOnHover verticalSpacing="sm" withTableBorder>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Campaign</Table.Th>

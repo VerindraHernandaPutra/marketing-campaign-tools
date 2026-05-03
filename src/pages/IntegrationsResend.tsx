@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card, Text, Button, PasswordInput, TextInput,
-  Group, Stack, Alert, Badge, Divider
+  Group, Stack, Alert, Badge, Divider, Anchor,
 } from '@mantine/core';
-import { MailIcon, SaveIcon, InfoIcon, CheckCircleIcon, Trash2Icon, AlertCircleIcon } from 'lucide-react';
+import { MailIcon, SaveIcon, InfoIcon, CheckCircleIcon, Trash2Icon } from 'lucide-react';
 import PageShell from '../components/Dashboard/PageShell';
 import PageHeader from '../components/Dashboard/PageHeader';
 import { useNotification } from '../context/NotificationContext';
@@ -86,11 +86,13 @@ const IntegrationsResend = () => {
   const handleDisconnect = async () => {
     if (!confirm('Are you sure you want to remove the Resend integration?')) return;
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('disconnect-integration', {
-      body: { organizationId: currentOrgId, platformPrefix: 'resend' },
-    });
-    if (error || data?.error) {
-      notify.error('Disconnect Failed', data?.error || error?.message || 'Could not disconnect.');
+    const { error } = await supabase
+      .from('organization_integrations')
+      .delete()
+      .eq('organization_id', currentOrgId)
+      .ilike('platform', 'resend%');
+    if (error) {
+      notify.error('Disconnect Failed', error.message || 'Could not disconnect.');
       setLoading(false);
       return;
     }
@@ -115,12 +117,11 @@ const IntegrationsResend = () => {
         {/* Setup Guide */}
         <Alert icon={<InfoIcon size={16} />} title="Setup Guide" color="blue" mb="lg">
           <Stack gap={4}>
-            <Text size="sm"><strong>Step 1:</strong> Create an account at{' '}
-              <a href="https://resend.com" target="_blank" rel="noreferrer">resend.com</a>
-            </Text>
-            <Text size="sm"><strong>Step 2:</strong> Go to <strong>Domains</strong> and add & verify your sending domain.</Text>
-            <Text size="sm"><strong>Step 3:</strong> Go to <strong>API Keys</strong> and create a new key with <em>Sending Access</em>.</Text>
-            <Text size="sm"><strong>Step 4:</strong> Paste it below along with your verified sender email!</Text>
+            <Text size="sm"><strong>Step 1:</strong> Create a free account at <Anchor href="https://resend.com/signup" target="_blank" size="sm">resend.com/signup</Anchor>.</Text>
+            <Text size="sm"><strong>Step 2:</strong> Go to <Anchor href="https://resend.com/domains" target="_blank" size="sm">Resend → Domains</Anchor>, click <strong>Add Domain</strong>, and follow the instructions to add DNS records (SPF, DKIM, DMARC) for your sending domain. Wait for verification (usually a few minutes).</Text>
+            <Text size="sm"><strong>Step 3:</strong> Go to <Anchor href="https://resend.com/api-keys" target="_blank" size="sm">Resend → API Keys</Anchor>, click <strong>Create API Key</strong>, choose <em>Sending Access</em> (not Full Access), and copy the key — it is only shown once.</Text>
+            <Text size="sm"><strong>Step 4:</strong> Fill in your verified sender email (e.g. <em>hello@yourdomain.com</em>), display name, and paste the API key below, then click <strong>Save & Connect</strong>.</Text>
+            <Text size="sm" c="dimmed"><strong>Testing:</strong> During development you can use <em>onboarding@resend.dev</em> as the sender address — this is Resend's shared test domain and does not require domain verification, but emails only reach the address registered to your Resend account.</Text>
           </Stack>
         </Alert>
 
@@ -189,13 +190,6 @@ const IntegrationsResend = () => {
           </Stack>
         </Card>
 
-        {/* Domain reminder */}
-        {!isConnected && (
-          <Alert icon={<AlertCircleIcon size={16} />} color="orange" mt="lg" title="Domain Required">
-            Resend only allows sending from addresses on a verified domain. During testing you can use{' '}
-            <code>onboarding@resend.dev</code> as your From address (Resend's shared test domain).
-          </Alert>
-        )}
     </PageShell>
   );
 };

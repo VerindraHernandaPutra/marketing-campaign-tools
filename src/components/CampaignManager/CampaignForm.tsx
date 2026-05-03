@@ -286,7 +286,10 @@ const CampaignForm: React.FC = () => {
     const metadata = {
         campaign_id: currentCampaignId,
         title: title,
-        content: content
+        content: content,
+        template_name: platformData.whatsapp?.template_name,
+        template_language: platformData.whatsapp?.template_language,
+        param_count: platformData.whatsapp?.template_param_count,
     };
 
     // We insert individual rows for each number (for now, simpler for our worker)
@@ -330,7 +333,7 @@ const CampaignForm: React.FC = () => {
       if (platformType === 'phone') {
         targets = combinedClients.map(c => c?.phone).filter(p => !!p).map(p => String(p).replace(/\D/g, ''));
       } else {
-        targets = combinedClients.map(c => c?.email).filter(e => !!e);
+        targets = combinedClients.map(c => c?.email).filter((e): e is string => !!e);
       }
       // Remove duplicates
       targets = Array.from(new Set(targets));
@@ -360,7 +363,7 @@ const CampaignForm: React.FC = () => {
     }
 
     if (combinedClients.length > 0) {
-      recipients = combinedClients.map(c => c?.email).filter(e => !!e);
+      recipients = combinedClients.map(c => c?.email).filter((e): e is string => !!e);
       recipients = Array.from(new Set(recipients));
     } else {
       const testEmail = prompt("Enter a test email address:");
