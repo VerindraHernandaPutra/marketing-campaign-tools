@@ -4,6 +4,17 @@ A multi-tenant SaaS platform for creating and distributing marketing campaigns a
 
 ---
 
+## Demo Videos
+
+| #      | Title                                                                | Duration |
+| ------ | -------------------------------------------------------------------- | -------- |
+| Part 1 | [Setup and Integration](https://www.youtube.com/watch?v=2EBOo5REB7E) | 10 min   |
+| Part 2 | [Website Walkthrough](https://www.youtube.com/watch?v=1BxAkL74daA)   | 15 min   |
+| Part 3 | [Analytics Results](https://www.youtube.com/watch?v=kW54c8aQ8PQ)     | 5 min    |
+| Extra  | [Omnichannel Inbox](https://www.youtube.com/watch?v=0RSUA3mAnyE)     | 1 min    |
+
+---
+
 ## Features
 
 - **Multi-channel campaigns** — WhatsApp (Meta Cloud API + Fonnte), Facebook Messenger, Instagram, and Email (Resend)
