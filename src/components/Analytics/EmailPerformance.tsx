@@ -66,7 +66,7 @@ const EmailPerformance: React.FC<Props> = ({ stats, loading }) => {
                 <Text fw={700} size="xl">{stats.total}</Text>
                 <Text size="xs" c="dimmed" mb={4}>emails</Text>
             </Group>
-            <Progress value={100} size="xs" color="gray" mt="md" />
+            <Progress aria-label="Total sent emails" value={100} size="xs" color="gray" mt="md" />
         </Paper>
 
         {/* 2. Delivered */}
@@ -81,7 +81,7 @@ const EmailPerformance: React.FC<Props> = ({ stats, loading }) => {
                 <Text fw={700} size="xl">{deliveryRate}%</Text>
                 <Text size="xs" c="teal" fw={500} mb={4}>{stats.delivered} reached</Text>
             </Group>
-            <Progress value={deliveryRate} size="xs" color="teal" mt="md" />
+            <Progress aria-label={`Delivery rate: ${deliveryRate}%`} value={deliveryRate} size="xs" color="teal" mt="md" />
         </Paper>
 
         {/* 3. Open Rate */}
@@ -96,7 +96,7 @@ const EmailPerformance: React.FC<Props> = ({ stats, loading }) => {
                 <Text fw={700} size="xl">{openRate}%</Text>
                 <Text size="xs" c="blue" mb={4}>{stats.opened} read</Text>
             </Group>
-            <Progress value={openRate} size="xs" color="blue" mt="md" />
+            <Progress aria-label={`Open rate: ${openRate}%`} value={openRate} size="xs" color="blue" mt="md" />
         </Paper>
 
         {/* 4. Click Rate - The most important marketing metric */}
@@ -111,7 +111,7 @@ const EmailPerformance: React.FC<Props> = ({ stats, loading }) => {
                 <Text fw={700} size="xl" c="violet.9">{clickRate}%</Text>
                 <Text size="xs" c="violet.7" mb={4} fw={600}>{stats.clicked} clicks</Text>
             </Group>
-             <Progress value={clickRate} size="xs" color="violet" mt="md" />
+             <Progress aria-label={`Click-through rate: ${clickRate}%`} value={clickRate} size="xs" color="violet" mt="md" />
         </Paper>
       </SimpleGrid>
 
@@ -129,28 +129,28 @@ const EmailPerformance: React.FC<Props> = ({ stats, loading }) => {
                         <Text size="sm">Sent</Text>
                         <Text size="sm" fw={700}>{stats.total}</Text>
                     </Group>
-                    <Progress value={100} color="gray" size="xl" radius="xl" />
+                    <Progress aria-label="Emails sent" value={100} color="gray" size="xl" radius="xl" />
                 </Box>
                 <Box>
                     <Group justify="space-between" mb={4}>
                         <Text size="sm">Delivered</Text>
                         <Text size="sm" fw={700}>{stats.delivered}</Text>
                     </Group>
-                    <Progress value={deliveryRate} color="teal" size="xl" radius="xl" />
+                    <Progress aria-label={`Delivered: ${stats.delivered}`} value={deliveryRate} color="teal" size="xl" radius="xl" />
                 </Box>
                 <Box>
                      <Group justify="space-between" mb={4}>
                         <Text size="sm">Opened</Text>
                         <Text size="sm" fw={700}>{stats.opened}</Text>
                     </Group>
-                    <Progress value={(stats.opened / stats.total) * 100} color="blue" size="xl" radius="xl" />
+                    <Progress aria-label={`Opened: ${stats.opened}`} value={(stats.opened / stats.total) * 100} color="blue" size="xl" radius="xl" />
                 </Box>
                 <Box>
                      <Group justify="space-between" mb={4}>
                         <Text size="sm">Clicked Link</Text>
                         <Text size="sm" fw={700}>{stats.clicked}</Text>
                     </Group>
-                    <Progress value={(stats.clicked / stats.total) * 100} color="violet" size="xl" radius="xl" striped animated />
+                    <Progress aria-label={`Clicked: ${stats.clicked}`} value={(stats.clicked / stats.total) * 100} color="violet" size="xl" radius="xl" striped animated />
                 </Box>
             </Stack>
          </Card>

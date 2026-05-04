@@ -74,7 +74,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
             <Text fw={700} size="xl">{stats.total}</Text>
             <Text size="xs" c="dimmed" mb={4}>all events</Text>
           </Group>
-          <Progress value={100} size="xs" color="gray" mt="md" />
+          <Progress aria-label="Total messages" value={100} size="xs" color="gray" mt="md" />
         </Paper>
 
         <Paper withBorder p="md" radius="md">
@@ -88,7 +88,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
             <Text fw={700} size="xl">{successRate}%</Text>
             <Text size="xs" c="teal" fw={500} mb={4}>{stats.sent} sent</Text>
           </Group>
-          <Progress value={successRate} size="xs" color="teal" mt="md" />
+          <Progress aria-label={`Sent: ${successRate}%`} value={successRate} size="xs" color="teal" mt="md" />
         </Paper>
 
         <Paper withBorder p="md" radius="md">
@@ -102,7 +102,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
             <Text fw={700} size="xl">{pendingRate}%</Text>
             <Text size="xs" c="blue" mb={4}>{stats.inProgress} queued</Text>
           </Group>
-          <Progress value={pendingRate} size="xs" color="blue" mt="md" />
+          <Progress aria-label={`In progress: ${pendingRate}%`} value={pendingRate} size="xs" color="blue" mt="md" />
         </Paper>
 
         <Paper withBorder p="md" radius="md">
@@ -116,7 +116,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
             <Text fw={700} size="xl">{failedRate}%</Text>
             <Text size="xs" c="red" mb={4}>{stats.failed} failed</Text>
           </Group>
-          <Progress value={failedRate} size="xs" color="red" mt="md" />
+          <Progress aria-label={`Failed: ${failedRate}%`} value={failedRate} size="xs" color="red" mt="md" />
         </Paper>
 
         <Paper withBorder p="md" radius="md">
@@ -128,7 +128,7 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
             <Text fw={700} size="xl">{stats.received}</Text>
             <Text size="xs" c="green" mb={4}>inbound</Text>
           </Group>
-          <Progress value={stats.received > 0 ? 100 : 0} size="xs" color="green" mt="md" />
+          <Progress aria-label={`Received: ${stats.received}`} value={stats.received > 0 ? 100 : 0} size="xs" color="green" mt="md" />
         </Paper>
       </SimpleGrid>
 
@@ -145,21 +145,21 @@ const WhatsAppPerformance: React.FC<Props> = ({ stats, loading, campaigns }) => 
                 <Text size="sm">Sent</Text>
                 <Text size="sm" fw={700}>{stats.sent}</Text>
               </Group>
-              <Progress value={successRate} color="teal" size="xl" radius="xl" />
+              <Progress aria-label={`Sent: ${stats.sent}`} value={successRate} color="teal" size="xl" radius="xl" />
             </Box>
             <Box>
               <Group justify="space-between" mb={4}>
                 <Text size="sm">In Progress</Text>
                 <Text size="sm" fw={700}>{stats.inProgress}</Text>
               </Group>
-              <Progress value={pendingRate} color="blue" size="xl" radius="xl" />
+              <Progress aria-label={`In progress: ${stats.inProgress}`} value={pendingRate} color="blue" size="xl" radius="xl" />
             </Box>
             <Box>
               <Group justify="space-between" mb={4}>
                 <Text size="sm">Failed</Text>
                 <Text size="sm" fw={700}>{stats.failed}</Text>
               </Group>
-              <Progress value={failedRate} color="red" size="xl" radius="xl" striped animated />
+              <Progress aria-label={`Failed: ${stats.failed}`} value={failedRate} color="red" size="xl" radius="xl" striped animated />
             </Box>
           </Stack>
         </Card>

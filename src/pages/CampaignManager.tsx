@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { Container, Title, Group, Button, Text } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
@@ -6,6 +7,7 @@ import PageShell from '../components/Dashboard/PageShell';
 import CampaignHistory from '../components/CampaignManager/CampaignHistory'; 
 
 const CampaignManager: React.FC = () => {
+  usePageTitle('Campaign Manager');
   const navigate = useNavigate();
 
   return (

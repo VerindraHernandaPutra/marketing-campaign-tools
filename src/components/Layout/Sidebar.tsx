@@ -701,8 +701,9 @@ const Sidebar: React.FC<SidebarProps> = () => {
                             {aiImagePreview && (
                                 <Box pos="relative" mb="xs">
                                     <MantineImage src={aiImagePreview} h={60} w="auto" radius="sm" fit="contain" bg="gray.1" style={{ border: '1px solid #ddd' }} />
-                                    <ActionIcon 
-                                        size="xs" color="red" variant="filled" radius="xl" 
+                                    <ActionIcon
+                                        aria-label="Remove reference image"
+                                        size="xs" color="red" variant="filled" radius="xl"
                                         pos="absolute" top={-5} right={-5}
                                         onClick={() => handleImageUpload(null)}
                                     >
@@ -735,7 +736,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     <Group justify="space-between">
                                         <Group gap={4}>
                                             <Tooltip label="Upload Reference Image">
-                                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => document.getElementById('chat-image-upload')?.click()}>
+                                                <ActionIcon aria-label="Upload Reference Image" variant="subtle" color="gray" size="md" onClick={() => document.getElementById('chat-image-upload')?.click()}>
                                                     <UploadIcon size={16} />
                                                 </ActionIcon>
                                             </Tooltip>
@@ -744,7 +745,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                         
                                         {chatHistory.length > 0 && (
                                             <Tooltip label="Clear History">
-                                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={clearChat}>
+                                                <ActionIcon aria-label="Clear chat history" variant="subtle" color="gray" size="md" onClick={clearChat}>
                                                     <RefreshCw size={14} />
                                                 </ActionIcon>
                                             </Tooltip>
@@ -752,11 +753,12 @@ const Sidebar: React.FC<SidebarProps> = () => {
                                     </Group>
                                 </Stack>
                                 
-                                <ActionIcon 
-                                    variant="default" 
-                                    size="xl" 
+                                <ActionIcon
+                                    aria-label="Generate AI design"
+                                    variant="default"
+                                    size="xl"
                                     radius="md"
-                                    onClick={handleGenerateAI} 
+                                    onClick={handleGenerateAI}
                                     disabled={isGenerating || (!currentPrompt.trim() && !aiImage)}
                                     style={{ borderColor: theme.colors.gray[4] }}
                                 >

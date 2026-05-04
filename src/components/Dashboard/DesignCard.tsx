@@ -330,7 +330,7 @@ const DesignCard: React.FC<DesignCardProps> = ({
           {design.tags && design.tags.length > 0 && (
               <Group gap={4} mt={8}>
                   {design.tags.slice(0, 2).map(tag => (
-                      <Badge key={tag} size="xs" variant="light" color="gray" radius="sm" className="font-normal">
+                      <Badge key={tag} size="xs" variant="outline" color="dark" radius="sm" className="font-normal">
                           {tag}
                       </Badge>
                   ))}

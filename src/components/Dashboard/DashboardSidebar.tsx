@@ -23,7 +23,7 @@ const NAV_STYLES = {
   },
   label: {
     fontSize: '0.8rem',
-    fontWeight: 400,
+    fontWeight: 500,
   },
 };
 
@@ -31,8 +31,8 @@ const NAV_STYLES = {
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Text
     size="xs"
-    fw={400}
-    c="dimmed"
+    fw={600}
+    c="gray.7"
     mb={3}
     mt={6}
     tt="uppercase"
@@ -49,14 +49,20 @@ interface NavItemProps {
   active: boolean;
   onClick: () => void;
   collapsed: boolean;
+  href?: string;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ label, icon, active, onClick, collapsed }) => {
+const NavItem: React.FC<NavItemProps> = ({ label, icon, active, onClick, collapsed, href }) => {
   if (collapsed) {
     return (
       <Tooltip label={label} position="right" withArrow>
         <Box
+          role="button"
+          tabIndex={0}
+          aria-label={label}
+          aria-current={active ? 'page' : undefined}
           onClick={onClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -80,6 +86,8 @@ const NavItem: React.FC<NavItemProps> = ({ label, icon, active, onClick, collaps
               (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
             }
           }}
+          onFocus={e => (e.currentTarget.style.outline = '2px solid var(--mantine-color-blue-5)')}
+          onBlur={e => (e.currentTarget.style.outline = 'none')}
         >
           {icon}
         </Box>
@@ -89,11 +97,13 @@ const NavItem: React.FC<NavItemProps> = ({ label, icon, active, onClick, collaps
 
   return (
     <NavLink
+      href={href}
       label={label}
       leftSection={icon}
       active={active}
-      onClick={onClick}
+      onClick={(e) => { e.preventDefault(); onClick(); }}
       styles={NAV_STYLES}
+      aria-current={active ? 'page' : undefined}
     />
   );
 };
@@ -129,10 +139,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
   // Role label — no "Business Owner", just the actual role name
   let roleLabel = 'User';
   let roleColor = '#6b7280'; // gray
-  if (isSuperAdmin) { roleLabel = 'Super Admin'; roleColor = '#ef4444'; }
-  else if (role === 'operator') { roleLabel = 'Operator'; roleColor = '#3b82f6'; }
-  else if (role === 'designer') { roleLabel = 'Designer'; roleColor = '#ec4899'; }
-  else if (role === 'marketer') { roleLabel = 'Marketer'; roleColor = '#06b6d4'; }
+  if (isSuperAdmin) { roleLabel = 'Super Admin'; roleColor = '#991b1b'; }
+  else if (role === 'operator') { roleLabel = 'Operator'; roleColor = '#1e40af'; }
+  else if (role === 'designer') { roleLabel = 'Designer'; roleColor = '#9d174d'; }
+  else if (role === 'marketer') { roleLabel = 'Marketer'; roleColor = '#155e75'; }
 
   const canAccessDesign = role === 'operator' || role === 'designer';
   const canAccessMarketing = role === 'operator' || role === 'marketer';
@@ -154,6 +164,8 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
   if (isSuperAdmin) {
     return (
       <Box
+        component="nav"
+        aria-label="Main navigation"
         w={sidebarWidth}
         style={{
           borderRight: '1px solid var(--mantine-color-gray-2)',
@@ -210,6 +222,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             {!collapsed && <SectionLabel>Overview</SectionLabel>}
             <NavItem
               label="Dashboard"
+              href="/"
               icon={<HomeIcon size={14} />}
               active={isActive('/', true)}
               onClick={() => navigate('/')}
@@ -220,6 +233,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             {!collapsed && <SectionLabel>Administration</SectionLabel>}
             <NavItem
               label="Admin Console"
+              href="/admin"
               icon={<ShieldIcon size={14} />}
               active={isActive('/admin', true)}
               onClick={() => navigate('/admin')}
@@ -233,6 +247,8 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
 
   return (
     <Box
+      component="nav"
+      aria-label="Main navigation"
       w={sidebarWidth}
       style={{
         borderRight: '1px solid var(--mantine-color-gray-2)',
@@ -297,7 +313,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
                 }}
               >
                 <Box style={{ color: roleColor }}>{roleIconSm}</Box>
-                <Text style={{ fontSize: '0.66rem', color: roleColor, fontWeight: 400 }}>
+                <Text style={{ fontSize: '0.66rem', color: roleColor, fontWeight: 600 }}>
                   {roleLabel}
                 </Text>
               </Box>
@@ -313,13 +329,13 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
 
           {/* GLOBAL */}
           {!collapsed && <SectionLabel>Global</SectionLabel>}
-          <NavItem label="Dashboard" icon={<HomeIcon size={14} />} active={isActive('/', true)} onClick={() => navigate('/')} collapsed={collapsed} />
+          <NavItem label="Dashboard" href="/" icon={<HomeIcon size={14} />} active={isActive('/', true)} onClick={() => navigate('/')} collapsed={collapsed} />
           {canAccessMarketing && (
             <>
-              <NavItem label="Inbox" icon={<MessageCircleIcon size={14} />} active={isActive('/inbox', true)} onClick={() => navigate('/inbox')} collapsed={collapsed} />
-              <NavItem label="Broadcast" icon={<SendIcon size={14} />} active={isActive('/campaign-manager')} onClick={() => navigate('/campaign-manager')} collapsed={collapsed} />
-              <NavItem label="WA Templates" icon={<MessageSquareIcon size={14} />} active={isActive('/wa-templates', true)} onClick={() => navigate('/wa-templates')} collapsed={collapsed} />
-              <NavItem label="Insight" icon={<BarChartIcon size={14} />} active={isActive('/analytics', true)} onClick={() => navigate('/analytics')} collapsed={collapsed} />
+              <NavItem label="Inbox" href="/inbox" icon={<MessageCircleIcon size={14} />} active={isActive('/inbox', true)} onClick={() => navigate('/inbox')} collapsed={collapsed} />
+              <NavItem label="Broadcast" href="/campaign-manager" icon={<SendIcon size={14} />} active={isActive('/campaign-manager')} onClick={() => navigate('/campaign-manager')} collapsed={collapsed} />
+              <NavItem label="WA Templates" href="/wa-templates" icon={<MessageSquareIcon size={14} />} active={isActive('/wa-templates', true)} onClick={() => navigate('/wa-templates')} collapsed={collapsed} />
+              <NavItem label="Insight" href="/analytics" icon={<BarChartIcon size={14} />} active={isActive('/analytics', true)} onClick={() => navigate('/analytics')} collapsed={collapsed} />
             </>
           )}
 
@@ -328,9 +344,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             <>
               {collapsed ? <Divider my={6} /> : <Divider my={8} />}
               {!collapsed && <SectionLabel>Design</SectionLabel>}
-              <NavItem label="Design Dashboard" icon={<LayoutIcon size={14} />} active={isActive('/design-dashboard', true)} onClick={() => navigate('/design-dashboard')} collapsed={collapsed} />
-              <NavItem label="Templates" icon={<ImageIcon size={14} />} active={isActive('/templates', true)} onClick={() => navigate('/templates')} collapsed={collapsed} />
-              <NavItem label="Campaign Designs" icon={<MegaphoneIcon size={14} />} active={isActive('/campaigns', true)} onClick={() => navigate('/campaigns')} collapsed={collapsed} />
+              <NavItem label="Design Dashboard" href="/design-dashboard" icon={<LayoutIcon size={14} />} active={isActive('/design-dashboard', true)} onClick={() => navigate('/design-dashboard')} collapsed={collapsed} />
+              <NavItem label="Templates" href="/templates" icon={<ImageIcon size={14} />} active={isActive('/templates', true)} onClick={() => navigate('/templates')} collapsed={collapsed} />
+              <NavItem label="Campaign Designs" href="/campaigns" icon={<MegaphoneIcon size={14} />} active={isActive('/campaigns', true)} onClick={() => navigate('/campaigns')} collapsed={collapsed} />
             </>
           )}
 
@@ -339,9 +355,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             <>
               {collapsed ? <Divider my={6} /> : <Divider my={8} />}
               {!collapsed && <SectionLabel>CRM</SectionLabel>}
-              <NavItem label="Clients" icon={<UsersIcon size={14} />} active={isActive('/clients', true)} onClick={() => navigate('/clients')} collapsed={collapsed} />
-              <NavItem label="Groups" icon={<LayersIcon size={14} />} active={isActive('/groups', true)} onClick={() => navigate('/groups')} collapsed={collapsed} />
-              <NavItem label="Users" icon={<UsersIcon size={14} />} active={isActive('/organization/users', true)} onClick={() => navigate('/organization/users')} collapsed={collapsed} />
+              <NavItem label="Clients" href="/clients" icon={<UsersIcon size={14} />} active={isActive('/clients', true)} onClick={() => navigate('/clients')} collapsed={collapsed} />
+              <NavItem label="Groups" href="/groups" icon={<LayersIcon size={14} />} active={isActive('/groups', true)} onClick={() => navigate('/groups')} collapsed={collapsed} />
+              <NavItem label="Users" href="/organization/users" icon={<UsersIcon size={14} />} active={isActive('/organization/users', true)} onClick={() => navigate('/organization/users')} collapsed={collapsed} />
             </>
           )}
 
@@ -350,10 +366,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed = false }
             <>
               {collapsed ? <Divider my={6} /> : <Divider my={8} />}
               {!collapsed && <SectionLabel>Platform</SectionLabel>}
-              <NavItem label="WhatsApp" icon={<MessageCircleIcon size={14} />} active={isActive('/integrations/whatsapp')} onClick={() => navigate('/integrations/whatsapp')} collapsed={collapsed} />
-              <NavItem label="Instagram" icon={<InstagramIcon size={14} />} active={isActive('/integrations/instagram')} onClick={() => navigate('/integrations/instagram')} collapsed={collapsed} />
-              <NavItem label="Messenger" icon={<MessagesSquareIcon size={14} />} active={isActive('/integrations/messenger')} onClick={() => navigate('/integrations/messenger')} collapsed={collapsed} />
-              <NavItem label="Resend (Email)" icon={<MailIcon size={14} />} active={isActive('/integrations/resend')} onClick={() => navigate('/integrations/resend')} collapsed={collapsed} />
+              <NavItem label="WhatsApp" href="/integrations/whatsapp" icon={<MessageCircleIcon size={14} />} active={isActive('/integrations/whatsapp')} onClick={() => navigate('/integrations/whatsapp')} collapsed={collapsed} />
+              <NavItem label="Instagram" href="/integrations/instagram" icon={<InstagramIcon size={14} />} active={isActive('/integrations/instagram')} onClick={() => navigate('/integrations/instagram')} collapsed={collapsed} />
+              <NavItem label="Messenger" href="/integrations/messenger" icon={<MessagesSquareIcon size={14} />} active={isActive('/integrations/messenger')} onClick={() => navigate('/integrations/messenger')} collapsed={collapsed} />
+              <NavItem label="Resend (Email)" href="/integrations/resend" icon={<MailIcon size={14} />} active={isActive('/integrations/resend')} onClick={() => navigate('/integrations/resend')} collapsed={collapsed} />
             </>
           )}
 

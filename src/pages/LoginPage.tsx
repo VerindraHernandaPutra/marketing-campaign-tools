@@ -132,6 +132,7 @@ export const LoginPage: React.FC = () => {
               placeholder="you@company.com"
               value={email}
               onChange={(e) => setEmail(e.currentTarget.value)}
+              aria-describedby={error ? 'login-error' : undefined}
               required
               size="md"
               radius="md"
@@ -142,13 +143,14 @@ export const LoginPage: React.FC = () => {
               placeholder="Your password"
               value={password}
               onChange={(e) => setPassword(e.currentTarget.value)}
+              aria-describedby={error ? 'login-error' : undefined}
               required
               size="md"
               radius="md"
             />
 
             {error && (
-              <Text c="red" size="sm" ta="center">
+              <Text id="login-error" role="alert" c="red" size="sm" ta="center">
                 {error}
               </Text>
             )}

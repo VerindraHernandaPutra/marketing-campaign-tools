@@ -14,7 +14,7 @@ const CampaignCreate: React.FC = () => {
       <DashboardHeader />
         <Flex>
           <DashboardSidebar />
-          <Box className="flex-1 p-8">
+          <Box component="main" className="flex-1 p-8">
             <Container size="xl">
               <Group mb="lg">
                 <Button variant="subtle" size="sm" leftSection={<ArrowLeft size={16} />} onClick={() => navigate('/campaign-manager')}>

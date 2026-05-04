@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useQuery } from '@tanstack/react-query';
 import {
   Title, Box, Grid, Select, Group, Button, Paper,
@@ -108,7 +109,7 @@ const TabHeader: React.FC<TabHeaderProps> = ({ icon, iconColor, title, descripti
         <ThemeIcon color={iconColor} variant="light" size="xl" radius="md">{icon}</ThemeIcon>
         <Box>
           <Group gap="xs">
-            <Title order={4}>{title}</Title>
+            <Title order={3}>{title}</Title>
             {badge}
           </Group>
           <Text size="sm" c="dimmed" mt={2}>{description}</Text>
@@ -144,6 +145,7 @@ function getScoreColor(score: number): string {
 }
 
 const Analytics: React.FC = () => {
+  usePageTitle('Analytics');
   const { currentOrgId } = useUserRole();
   const [timeRange, setTimeRange] = useState<string | null>('7d');
   const [summary, setSummary] = useState<AnalysisSummary | null>(null);
@@ -233,6 +235,7 @@ const Analytics: React.FC = () => {
                 Refresh
               </Button>
               <Select
+                aria-label="Time range"
                 value={timeRange}
                 onChange={setTimeRange}
                 data={TIME_RANGE_OPTIONS}

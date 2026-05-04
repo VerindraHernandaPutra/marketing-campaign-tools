@@ -29,7 +29,7 @@ const MetricsCard: React.FC<MetricsCardProps> = ({
         }}
       />
       <Group justify="space-between" mb="xs">
-        <Text size="xs" c="dimmed" fw={700} tt="uppercase">{title}</Text>
+        <Text size="xs" c="gray.7" fw={700} tt="uppercase">{title}</Text>
         {Icon && (
           <ThemeIcon variant="light" color={color} size="md" radius="xl">
             <Icon size={16} />
@@ -40,8 +40,8 @@ const MetricsCard: React.FC<MetricsCardProps> = ({
       {subtitle && <Text size="xs" c="dimmed" mt={2}>{subtitle}</Text>}
       <Group gap={4} mt="sm">
         {trend === 'up'
-          ? <TrendingUpIcon size={13} color="var(--mantine-color-green-6)" />
-          : <TrendingDownIcon size={13} color="var(--mantine-color-red-6)" />}
+          ? <TrendingUpIcon size={13} aria-hidden="true" color="var(--mantine-color-green-6)" />
+          : <TrendingDownIcon size={13} aria-hidden="true" color="var(--mantine-color-red-6)" />}
         <Text size="xs" fw={600} c={trendColor}>{Math.abs(change)}% this period</Text>
       </Group>
     </Paper>

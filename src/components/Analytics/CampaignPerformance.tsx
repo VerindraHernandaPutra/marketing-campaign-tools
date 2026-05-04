@@ -130,6 +130,7 @@ const CampaignPerformance: React.FC<CampaignPerformanceProps> = ({ campaigns }) 
                 <Table.Td>
                   <Group gap="xs">
                     <Progress
+                      aria-label={`Performance: ${campaign.performance}%`}
                       value={campaign.performance}
                       color={getPerformanceColor(campaign.performance)}
                       w={70}

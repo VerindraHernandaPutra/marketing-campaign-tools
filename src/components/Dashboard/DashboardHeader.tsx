@@ -104,7 +104,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onToggleSidebar }) =>
           {/* Initials chip */}
           {!loadingRole ? (
             <Badge
-              size="xs"
+              size="sm"
               variant="filled"
               color={roleColor}
               style={{ cursor: 'default', fontWeight: 700, letterSpacing: 0.5 }}
@@ -118,7 +118,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onToggleSidebar }) =>
           {/* Avatar with dropdown */}
           <Menu shadow="md" width={200} position="bottom-end">
             <Menu.Target>
-              <UnstyledButton>
+              <UnstyledButton aria-label="User menu">
                 <Avatar
                   src={profile?.avatar_url}
                   color={roleColor}

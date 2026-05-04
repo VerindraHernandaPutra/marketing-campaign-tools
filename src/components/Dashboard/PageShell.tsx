@@ -16,6 +16,20 @@ const PageShell: React.FC<PageShellProps> = ({ children, noPadding = false }) =>
 
   return (
     <div style={{ display: 'flex', height: '100vh' }} className="bg-white dark:bg-gray-900">
+      <a
+        href="#main-content"
+        style={{
+          position: 'absolute', top: -48, left: 0, zIndex: 9999,
+          padding: '10px 16px', background: '#4f46e5', color: 'white',
+          borderRadius: '0 0 6px 0', fontWeight: 600, fontSize: '0.875rem',
+          textDecoration: 'none', transition: 'top 0.15s',
+        }}
+        onFocus={(e) => (e.currentTarget.style.top = '0')}
+        onBlur={(e) => (e.currentTarget.style.top = '-48px')}
+      >
+        Skip to content
+      </a>
+
       {/* Sidebar — full height, always visible */}
       <DashboardSidebar collapsed={collapsed} />
 
@@ -24,9 +38,9 @@ const PageShell: React.FC<PageShellProps> = ({ children, noPadding = false }) =>
         <DashboardHeader
           onToggleSidebar={() => setCollapsed(c => !c)}
         />
-        <div style={{ flex: 1, overflowY: 'auto', padding: noPadding ? '0' : '32px' }}>
+        <main id="main-content" style={{ flex: 1, overflowY: 'auto', padding: noPadding ? '0' : '32px' }}>
           {children}
-        </div>
+        </main>
       </div>
     </div>
   );

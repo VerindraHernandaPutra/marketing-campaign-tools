@@ -12,7 +12,7 @@ interface PageHeaderProps {
 const PageHeader: React.FC<PageHeaderProps> = ({ icon, title, subtitle, gradient, action }) => (
   <Group justify="space-between" mb="xl" align="flex-start">
     <Group gap="md">
-      <ThemeIcon size="xl" radius="md" variant="gradient" gradient={gradient}>
+      <ThemeIcon size="xl" radius="md" variant="gradient" gradient={gradient} aria-hidden="true">
         {icon}
       </ThemeIcon>
       <Box>

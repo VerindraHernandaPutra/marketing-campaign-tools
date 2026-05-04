@@ -62,6 +62,9 @@ const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     setNewTitle(projectTitle);
+    if (projectTitle) {
+      document.title = `${projectTitle} — Design Editor`;
+    }
   }, [projectTitle]);
 
   const handleTitleBlur = () => {
@@ -115,10 +118,11 @@ const Header: React.FC<HeaderProps> = ({
           {/* LEFT SECTION: Navigation & File Info */}
           <Group gap="sm" wrap="nowrap">
             <Tooltip label="Back to Dashboard">
-              <ActionIcon 
-                variant="subtle" 
-                color="gray" 
-                size="lg" 
+              <ActionIcon
+                aria-label="Back to Dashboard"
+                variant="subtle"
+                color="gray"
+                size="lg"
                 onClick={() => navigate('/')}
                 radius="xl"
               >
@@ -130,6 +134,7 @@ const Header: React.FC<HeaderProps> = ({
             <Box>
               <Group gap={6} align="center">
                 <TextInput
+                  aria-label="Project title"
                   value={newTitle}
                   onChange={(e) => {
                       setNewTitle(e.currentTarget.value);
@@ -161,7 +166,7 @@ const Header: React.FC<HeaderProps> = ({
                   }}
                 />
                 {isTemplate !== undefined && (
-                  <Badge size="xs" variant="light" color={isTemplate ? 'grape' : 'indigo'} style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <Badge size="xs" variant="filled" color={isTemplate ? 'grape' : 'indigo'} style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {isTemplate ? 'Template' : 'Campaign'}
                   </Badge>
                 )}
@@ -177,7 +182,7 @@ const Header: React.FC<HeaderProps> = ({
                 {/* FILE MENU */}
                 <Menu shadow="md" width={200} trigger="hover" openDelay={100} closeDelay={200}>
                   <Menu.Target>
-                    <Button variant="subtle" size="compact-xs" color="gray" fw={400} h={20}>File</Button>
+                    <Button variant="subtle" size="compact-sm" color="gray" fw={400}>File</Button>
                   </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Item leftSection={<FileType size={14} />} onClick={handleManualSave}>
@@ -192,7 +197,7 @@ const Header: React.FC<HeaderProps> = ({
                 {/* EDIT MENU */}
                 <Menu shadow="md" width={200} trigger="hover" openDelay={100} closeDelay={200}>
                   <Menu.Target>
-                    <Button variant="subtle" size="compact-xs" color="gray" fw={400} h={20}>Edit</Button>
+                    <Button variant="subtle" size="compact-sm" color="gray" fw={400}>Edit</Button>
                   </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Item 
@@ -217,7 +222,7 @@ const Header: React.FC<HeaderProps> = ({
                 {/* VIEW MENU */}
                 <Menu shadow="md" width={220} trigger="hover" openDelay={100} closeDelay={200}>
                   <Menu.Target>
-                    <Button variant="subtle" size="compact-xs" color="gray" fw={400} h={20}>View</Button>
+                    <Button variant="subtle" size="compact-sm" color="gray" fw={400}>View</Button>
                   </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Label>Canvas Controls</Menu.Label>
@@ -259,12 +264,13 @@ const Header: React.FC<HeaderProps> = ({
             {/* Undo / Redo Group */}
             <Group gap={4} className="bg-gray-100 dark:bg-gray-800 p-1 rounded-md hidden sm:flex">
               <Tooltip label="Undo (Ctrl+Z)">
-                  <ActionIcon 
-                    variant="subtle" 
-                    color="gray" 
-                    size="md" 
-                    radius="sm" 
-                    onClick={onUndo} 
+                  <ActionIcon
+                    aria-label="Undo (Ctrl+Z)"
+                    variant="subtle"
+                    color="gray"
+                    size="md"
+                    radius="sm"
+                    onClick={onUndo}
                     disabled={!canUndo}
                     style={{ opacity: !canUndo ? 0.4 : 1 }}
                   >
@@ -272,12 +278,13 @@ const Header: React.FC<HeaderProps> = ({
                   </ActionIcon>
               </Tooltip>
               <Tooltip label="Redo (Ctrl+Y)">
-                  <ActionIcon 
-                    variant="subtle" 
-                    color="gray" 
-                    size="md" 
-                    radius="sm" 
-                    onClick={onRedo} 
+                  <ActionIcon
+                    aria-label="Redo (Ctrl+Y)"
+                    variant="subtle"
+                    color="gray"
+                    size="md"
+                    radius="sm"
+                    onClick={onRedo}
                     disabled={!canRedo}
                     style={{ opacity: !canRedo ? 0.4 : 1 }}
                   >
@@ -290,9 +297,10 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Properties Panel Toggle */}
             <Tooltip label={propertiesPanelOpened ? "Hide Properties" : "Show Properties"}>
-              <ActionIcon 
-                  onClick={onTogglePropertiesPanel} 
-                  size="lg" 
+              <ActionIcon
+                  aria-label={propertiesPanelOpened ? "Hide Properties" : "Show Properties"}
+                  onClick={onTogglePropertiesPanel}
+                  size="lg"
                   variant={propertiesPanelOpened ? "light" : "default"}
                   color={propertiesPanelOpened ? "blue" : "gray"}
                   radius="md"
@@ -338,15 +346,16 @@ const Header: React.FC<HeaderProps> = ({
       >
         <Center>
           {previewImage && (
-            <Image 
-              src={previewImage} 
-              radius="md" 
-              style={{ 
-                maxHeight: '80vh', 
-                maxWidth: '100%', 
+            <Image
+              src={previewImage}
+              alt={`Preview of ${newTitle}`}
+              radius="md"
+              style={{
+                maxHeight: '80vh',
+                maxWidth: '100%',
                 objectFit: 'contain',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-              }} 
+              }}
             />
           )}
         </Center>

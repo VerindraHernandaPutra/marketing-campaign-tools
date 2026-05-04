@@ -53,7 +53,7 @@ const PlatformSelector: React.FC<PlatformSelectorProps> = ({
         return <Paper key={platform.id} p="md" withBorder className={`cursor-pointer transition-all ${isSelected ? 'border-2 border-blue-500 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => togglePlatform(platform.id)}>
               {/* 'spacing' diubah menjadi 'gap' */}
               <Group gap="sm">
-                <Checkbox checked={isSelected} onChange={() => togglePlatform(platform.id)} onClick={e => e.stopPropagation()} />
+                <Checkbox checked={isSelected} onChange={() => togglePlatform(platform.id)} onClick={e => e.stopPropagation()} aria-label={platform.name} />
                 <Icon size={20} style={{
               color: platform.color
             }} />

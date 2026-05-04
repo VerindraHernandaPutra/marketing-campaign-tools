@@ -669,7 +669,11 @@ const CampaignForm: React.FC = () => {
 
       <Paper shadow="sm" p="xl" mb="xl" pos="relative">
         <LoadingOverlay visible={isSubmitting} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
-        <Stepper active={activeStep} onStepClick={handleStepClick}>
+        <Stepper
+          active={activeStep}
+          onStepClick={handleStepClick}
+          styles={{ stepDescription: { color: 'var(--mantine-color-gray-7)' } }}
+        >
           <Stepper.Step label="Platforms" description="Channels" />
           <Stepper.Step label="Details" description="Content" />
           <Stepper.Step label="Target" description="Audience" />
