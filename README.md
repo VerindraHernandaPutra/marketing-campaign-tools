@@ -1,74 +1,200 @@
-# 🌐 Marketing Campaign Tools
+# Marketing Campaign Tools
 
-Deskripsi singkat proyekmu — misalnya:
-> Website ini dibangun menggunakan React + TypeScript + Vite dengan dukungan UI Mantine, TailwindCSS, serta integrasi grafik dan kalender menggunakan Recharts dan FullCalendar.
-
----
-
-## 🚀 Tech Stack
-
-**Frontend Framework:**
-- [React](https://react.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Vite](https://vitejs.dev/) — build tool super cepat
-
-**UI Library:**
-- [Mantine](https://mantine.dev/) — komponen React modern & powerful
-- [TailwindCSS](https://tailwindcss.com/) — utility-first CSS framework
-- [Lucide React](https://lucide.dev/) — ikon open-source untuk React
-
-**Visualization & Calendar:**
-- [Recharts](https://recharts.org/) — visualisasi data berbasis chart
-- [FullCalendar](https://fullcalendar.io/) — tampilan kalender interaktif (day grid, time grid, dsb.)
-
-**Routing:**
-- [React Router DOM](https://reactrouter.com/en/main) — manajemen rute halaman SPA
+A multi-tenant SaaS platform for creating and distributing marketing campaigns across WhatsApp, Facebook, Instagram, and Email — with a built-in Canva-like design editor, contact management, and real-time analytics.
 
 ---
 
-## ⚙️ Software Requirements
+## Features
 
-Pastikan perangkat kamu sudah memiliki:
-
-| Software | Minimum Version | Keterangan |
-|-----------|-----------------|-------------|
-| **Node.js** | `>= 18.x` | Menjalankan server pengembangan & build proyek |
-| **npm** | `>= 9.x` | Manajemen dependensi |
-| **Vite** | (included via npm) | Build tool & dev server |
-| **Browser Modern** | (Chrome/Edge/Firefox) | Untuk menjalankan aplikasi |
+- **Multi-channel campaigns** — WhatsApp (Meta Cloud API + Fonnte), Facebook Messenger, Instagram, and Email (Resend)
+- **Design editor** — Fabric.js-powered canvas editor for creating campaign visuals
+- **Contact management** — clients, groups, and contact lists scoped per organization
+- **Analytics dashboard** — delivery funnel, engagement metrics, and campaign performance tracking
+- **Role-based access** — Admin, Operator, Designer, and Marketer roles per organization
+- **Multi-tenant** — every resource is scoped to an organization with Supabase RLS
+- **AI tools** — AI image generation and caption generation via Supabase Edge Functions
+- **Social media posting** — LinkedIn, Twitter, TikTok, and more via Ayrshare
 
 ---
 
-## 📦 Instalasi Dependensi
+## Tech Stack
 
-Clone repositori ini terlebih dahulu:
+### Frontend
 
-```bash
-git clone https://github.com/username/nama-proyek.git
-cd nama-proyek
+| Technology       | Version | Purpose                 |
+| ---------------- | ------- | ----------------------- |
+| React            | 19      | UI framework            |
+| TypeScript       | 5.9     | Type safety             |
+| Vite             | 7       | Build tool & dev server |
+| Mantine UI       | 8       | Component library       |
+| Tailwind CSS     | 3       | Utility-first styling   |
+| Fabric.js        | 6.9     | Canvas design editor    |
+| React Router DOM | 7.9     | Client-side routing     |
+| TanStack Query   | 5       | Server state management |
+| Recharts         | 3.3     | Data visualization      |
+| FullCalendar     | 6.1     | Calendar scheduling     |
+| Lucide React     | —       | Icon library            |
+
+### Backend & Infrastructure
+
+| Technology        | Purpose                                              |
+| ----------------- | ---------------------------------------------------- |
+| Supabase          | PostgreSQL + Auth + Realtime + Edge Functions (Deno) |
+| Node.js / Express | Microservice queue workers                           |
+| PM2               | Microservice process management                      |
+
+### External Integrations
+
+| Service        | Purpose                                                |
+| -------------- | ------------------------------------------------------ |
+| Meta Graph API | Facebook Pages & Instagram OAuth + Messenger API       |
+| Meta Cloud API | WhatsApp message delivery                              |
+| Fonnte         | WhatsApp gateway (alternative to Meta Cloud API)       |
+| Resend         | Transactional email delivery                           |
+| Ayrshare       | Social media posting (LinkedIn, Twitter, TikTok, etc.) |
+
+---
+
+## Architecture
+
+```
+Frontend (React + Vite)
+    │
+    ▼
+Supabase (PostgreSQL + Auth + RLS + Realtime)
+    │
+    ├── Edge Functions (Deno)
+    │       ├── send-whatsapp     → whatsapp_outbox table
+    │       ├── send-email        → Resend API
+    │       ├── send-social       → Ayrshare API
+    │       ├── send-chat-message → messenger_outbox table
+    │       ├── meta-oauth        → Meta OAuth2 token exchange
+    │       ├── analytics-overview / summarize-analytics
+    │       └── generate-image / generate-caption (AI)
+    │
+    └── Microservices (Node.js / Express — managed by PM2)
+            ├── backend-wa       (port 3051) — polls whatsapp_outbox → Meta Cloud API
+            ├── backend-email    — email API with Resend
+            └── backend-messenger (port 3053) — polls messenger_outbox → Meta Graph API
 ```
 
-Lalu jalankan perintah berikut untuk menginstal seluruh dependensi utama dan dev:
+**Outbox pattern:** The frontend writes to Supabase outbox tables. Microservices poll those tables and call the provider APIs, decoupling message delivery from the UI.
 
-```bash
-npm install react react-dom @mantine/core @mantine/hooks react-router-dom lucide-react @mantine/dates @fullcalendar/react @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction recharts
+---
+
+## Project Structure
+
+```
+marketing-campaign-tools/
+├── src/
+│   ├── AppRouter.tsx               # Route definitions with role guards
+│   ├── auth/                       # AuthProvider, UserContext, useAuth hook
+│   ├── components/
+│   │   ├── CanvaEditor.tsx         # Fabric.js canvas editor
+│   │   ├── Analytics/              # MetricsCard, CampaignPerformance, WhatsApp/EmailPerformance
+│   │   ├── CampaignManager/flows/  # EmailFlow, WhatsappFlow, SocialMediaFlow
+│   │   └── Dashboard/              # Layout components
+│   ├── context/
+│   │   ├── CanvasContext.tsx        # Fabric.js canvas state
+│   │   └── NotificationContext.tsx  # Toast notifications
+│   ├── pages/                      # Route-level page components
+│   ├── types/supabase.ts           # Auto-generated DB types
+│   └── supabaseClient.ts           # Supabase client init
+├── supabase/functions/             # Deno edge functions
+├── backend-wa/                     # WhatsApp queue worker
+├── backend-email/                  # Email API worker
+├── backend-messenger/              # Messenger queue worker
+├── ecosystem.config.cjs            # PM2 process config
+└── vite.config.ts
 ```
 
-Tambahkan dependensi pengembangan (TypeScript, linting, dan styling):
+---
+
+## Requirements
+
+| Software       | Minimum Version            |
+| -------------- | -------------------------- |
+| Node.js        | >= 18.x                    |
+| npm            | >= 9.x                     |
+| PM2            | Latest (for microservices) |
+| Modern browser | Chrome / Edge / Firefox    |
+
+---
+
+## Getting Started
+
+### 1. Clone the repository
+
 ```bash
-npm install --save-dev @types/node @types/react @types/react-dom @typescript-eslint/eslint-plugin @typescript-eslint/parser @vitejs/plugin-react eslint eslint-plugin-react-hooks eslint-plugin-react-refresh typescript vite tailwindcss@3 autoprefixer postcss
+git clone https://github.com/username/marketing-campaign-tools.git
+cd marketing-campaign-tools
 ```
 
-## 🎨 Konfigurasi TailwindCSS
+### 2. Install dependencies
 
-Inisialisasi Tailwind dan PostCSS:
 ```bash
-npx tailwindcss init -p
+npm install
 ```
 
-## 🧠 Skrip Pengembangan
+### 3. Configure environment variables
 
-Menjalankan server pengembangan:
+Create a `.env` file in the project root:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 4. Start the development server
+
 ```bash
 npm run dev
 ```
+
+### 5. Start microservices (optional, for WhatsApp/Messenger delivery)
+
+```bash
+pm2 start ecosystem.config.cjs
+```
+
+---
+
+## Available Scripts
+
+| Command                          | Description                      |
+| -------------------------------- | -------------------------------- |
+| `npm run dev`                    | Start Vite development server    |
+| `npm run build`                  | Build for production             |
+| `npm run preview`                | Preview production build locally |
+| `npm run lint`                   | Run ESLint                       |
+| `pm2 start ecosystem.config.cjs` | Start all microservices          |
+| `pm2 status`                     | Check microservice status        |
+| `pm2 logs`                       | View microservice logs           |
+
+---
+
+## Role System
+
+| Role         | Access                                                    |
+| ------------ | --------------------------------------------------------- |
+| **Admin**    | Full access — org settings, user management, all features |
+| **Operator** | Campaign management, contacts, analytics                  |
+| **Designer** | Design editor, template library                           |
+| **Marketer** | Campaign creation, analytics (read-only)                  |
+
+Super Admins can manage multiple organizations from the Admin Dashboard.
+
+---
+
+## Database
+
+The platform uses Supabase (PostgreSQL) with Row Level Security (RLS). Key tables:
+
+- `organizations` + `organization_members` — multi-tenant org and role assignments
+- `organization_integrations` — OAuth tokens per org (Meta, Fonnte, Resend, Ayrshare)
+- `marketing_campaigns` — campaign metadata and configuration
+- `whatsapp_outbox` + `messenger_outbox` — message delivery queues
+- `social_posts` — social media post queue
+- `email_events` — email tracking (opens, clicks, bounces)
+- `clients`, `groups`, `contacts` — contact management
+- `projects` — Fabric.js canvas JSON storage
